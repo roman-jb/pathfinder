@@ -1,8 +1,11 @@
 package v2;
 
 import java.awt.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class Renderer3D {
 
@@ -15,9 +18,14 @@ public class Renderer3D {
             int panelWidth,
             int panelHeight
     ) {
-        drawLegend(g2, data.hideUnusedNodes);
+        drawLegend(g2, data);
 
         Set<Point3D> pathSet = new HashSet<>(data.path);
+
+        if (data.pathType == PathType.INTERACTIVE) {
+            drawInteractive(g2, data, scale, angleX, angleY, panelWidth, panelHeight, pathSet);
+            return;
+        }
 
         List<Sphere> spheres = new ArrayList<>();
         List<Cube> pathCubes = new ArrayList<>();
@@ -61,18 +69,82 @@ public class Renderer3D {
         }
     }
 
-    private void drawLegend(Graphics2D g2, boolean hideUnusedNodes) {
+    private void drawInteractive(
+            Graphics2D g2,
+            RenderData data,
+            double scale,
+            double angleX,
+            double angleY,
+            int panelWidth,
+            int panelHeight,
+            Set<Point3D> pathSet
+    ) {
+        Grid grid = data.grid;
+        Projection3D projection = new Projection3D(
+                grid,
+                scale,
+                angleX,
+                angleY,
+                panelWidth,
+                panelHeight
+        );
+
+        List<Sphere> spheres = new ArrayList<>();
+        List<Cube> pathCubes = new ArrayList<>();
+
+        for (int z = 0; z < grid.depth; z++) {
+            for (int y = 0; y < grid.height; y++) {
+                for (int x = 0; x < grid.width; x++) {
+                    Point3D p = new Point3D(x, y, z);
+
+                    if (!RenderUtils.isInteractiveVisible(data, p)) {
+                        continue;
+                    }
+
+                    if (pathSet.contains(p)) {
+                        pathCubes.add(createCube(p, projection, scale));
+                    } else {
+                        spheres.add(new Sphere(
+                                p,
+                                projection.project(p.x, p.y, p.z),
+                                RenderUtils.getCellColor(data, p, pathSet)
+                        ));
+                    }
+                }
+            }
+        }
+
+        spheres.sort(Comparator.comparingDouble(s -> s.projected.depth));
+        pathCubes.sort(Comparator.comparingDouble(c -> c.depth));
+
+        for (Sphere sphere : spheres) {
+            drawSphere(g2, sphere, scale);
+        }
+
+        drawInteractiveLinks(g2, data, projection, scale);
+
+        for (Cube cube : pathCubes) {
+            drawCube(g2, data, cube, pathSet, scale, projection);
+        }
+    }
+
+    private void drawLegend(Graphics2D g2, RenderData data) {
         g2.setFont(new Font("Arial", Font.BOLD, 14));
         g2.setColor(Color.BLACK);
         g2.drawString("3D mode: drag mouse to rotate", 20, 25);
-        g2.drawString(
-                hideUnusedNodes
-                        ? "Unused cells hidden"
-                        : "Small gray spheres = unused cells",
-                20,
-                45
-        );
-        g2.drawString("Green = Start, Red = End, Blue = Path", 20, 65);
+        if (data.pathType == PathType.INTERACTIVE) {
+            g2.drawString("Click gray spheres, then click again to confirm", 20, 45);
+            g2.drawString("Green = active step, Blue = confirmed path", 20, 65);
+        } else {
+            g2.drawString(
+                    data.hideUnusedNodes
+                            ? "Unused cells hidden"
+                            : "Small gray spheres = unused cells",
+                    20,
+                    45
+            );
+            g2.drawString("Green = Start, Red = End, Blue = Path", 20, 65);
+        }
     }
 
     private void drawSphere(Graphics2D g2, Sphere sphere, double scale) {
@@ -83,10 +155,15 @@ public class Renderer3D {
         int x = projected.screenX - size / 2;
         int y = projected.screenY - size / 2;
 
-        g2.setColor(new Color(155, 155, 155, 135));
+        Color fill = sphere.color != null ? sphere.color : new Color(155, 155, 155, 135);
+        Color outline = sphere.color != null
+                ? RenderUtils.darken(sphere.color, 0.72)
+                : new Color(80, 80, 80, 120);
+
+        g2.setColor(new Color(fill.getRed(), fill.getGreen(), fill.getBlue(), fill.getAlpha()));
         g2.fillOval(x, y, size, size);
 
-        g2.setColor(new Color(80, 80, 80, 120));
+        g2.setColor(new Color(outline.getRed(), outline.getGreen(), outline.getBlue(), outline.getAlpha()));
         g2.drawOval(x, y, size, size);
 
         int highlightSize = Math.max(2, size / 3);
@@ -207,6 +284,47 @@ public class Renderer3D {
 
         g2.setColor(Color.BLACK);
         g2.drawString(text, x, y);
+    }
+
+    private void drawInteractiveLinks(Graphics2D g2, RenderData data, Projection3D projection, double scale) {
+        List<Point3D> path = data.path;
+
+        if (path.size() >= 2) {
+            g2.setStroke(new BasicStroke(
+                    Math.max(2f, (float) (6f * scale)),
+                    BasicStroke.CAP_ROUND,
+                    BasicStroke.JOIN_ROUND
+            ));
+            g2.setColor(new Color(75, 145, 235, 190));
+
+            for (int i = 1; i < path.size(); i++) {
+                Point3D aPoint = path.get(i - 1);
+                Point3D bPoint = path.get(i);
+
+                ProjectedPoint a = projection.project(aPoint.x, aPoint.y, aPoint.z);
+                ProjectedPoint b = projection.project(bPoint.x, bPoint.y, bPoint.z);
+
+                g2.drawLine(a.screenX, a.screenY, b.screenX, b.screenY);
+            }
+        }
+
+        if (data.interactiveSelected != null && !path.isEmpty()) {
+            Point3D lastConfirmed = path.get(path.size() - 1);
+            Point3D selected = data.interactiveSelected;
+
+            g2.setStroke(new BasicStroke(
+                    Math.max(2f, (float) (6f * scale)),
+                    BasicStroke.CAP_ROUND,
+                    BasicStroke.JOIN_ROUND
+            ));
+            g2.setColor(new Color(70, 190, 90, 190));
+
+            ProjectedPoint a = projection.project(lastConfirmed.x, lastConfirmed.y, lastConfirmed.z);
+            ProjectedPoint b = projection.project(selected.x, selected.y, selected.z);
+            g2.drawLine(a.screenX, a.screenY, b.screenX, b.screenY);
+        }
+
+        g2.setStroke(new BasicStroke(1f));
     }
 
     private void drawPathLines(

@@ -2,7 +2,10 @@ package v2;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class MainFrame extends JFrame {
 
@@ -26,6 +29,9 @@ public class MainFrame extends JFrame {
     private Grid currentGrid;
     private Point3D currentStart;
     private Point3D currentEnd;
+    private List<Point3D> interactivePath = new ArrayList<>();
+    private Point3D interactivePending;
+    private boolean interactiveComplete;
 
     public MainFrame() {
         super("Pathfinding 2D / 3D");
@@ -64,6 +70,8 @@ public class MainFrame extends JFrame {
         add(controls, BorderLayout.NORTH);
         add(matrixPanel, BorderLayout.CENTER);
 
+        matrixPanel.setClickHandler(this::handleNodeClick);
+
         generateButton.addActionListener(e -> generateMatrix());
         rerollPointsButton.addActionListener(e -> rerollStartEnd());
 
@@ -72,11 +80,16 @@ public class MainFrame extends JFrame {
         );
 
         pathTypeBox.addActionListener(e -> {
-            if (currentGrid != null) rebuildPath();
+            if (currentGrid != null) {
+                syncPathStateToSelection();
+                refreshDisplay();
+            }
         });
 
         hideUnusedNodesCheckBox.addActionListener(e -> {
-            if (currentGrid != null) rebuildPath();
+            if (currentGrid != null) {
+                refreshDisplay();
+            }
         });
 
         scaleSlider.addChangeListener(e ->
@@ -104,17 +117,49 @@ public class MainFrame extends JFrame {
     }
 
     private void rerollStartEnd() {
+        if (currentGrid == null) return;
+
         currentStart = currentGrid.randomPoint();
 
-        do {
-            currentEnd = currentGrid.randomPoint();
-        } while (currentEnd.equals(currentStart));
+        int cellCount = currentGrid.width * currentGrid.height * currentGrid.depth;
+        if (cellCount <= 1) {
+            currentEnd = currentStart;
+        } else {
+            do {
+                currentEnd = currentGrid.randomPoint();
+            } while (currentEnd.equals(currentStart));
+        }
 
-        rebuildPath();
+        syncPathStateToSelection();
+        refreshDisplay();
     }
 
-    private void rebuildPath() {
-        PathType pathType = (PathType) pathTypeBox.getSelectedItem();
+    private void refreshDisplay() {
+        if (currentGrid == null || currentStart == null || currentEnd == null) {
+            return;
+        }
+
+        PathType pathType = currentPathType();
+
+        if (pathType == PathType.INTERACTIVE) {
+            Set<Point3D> frontier = getInteractiveFrontier();
+
+            pathLengthLabel.setText("Length: " + Math.max(0, interactivePath.size() - 1));
+            pathCostLabel.setText("Cost: " + currentGrid.calculatePathCost(interactivePath));
+
+            matrixPanel.setData(new RenderData(
+                    currentGrid,
+                    pathType,
+                    currentStart,
+                    currentEnd,
+                    new ArrayList<>(interactivePath),
+                    frontier,
+                    interactivePending,
+                    interactiveComplete,
+                    hideUnusedNodesCheckBox.isSelected()
+            ));
+            return;
+        }
 
         List<Point3D> path = Pathfinder.findPath(
                 currentGrid,
@@ -128,10 +173,109 @@ public class MainFrame extends JFrame {
 
         matrixPanel.setData(new RenderData(
                 currentGrid,
+                pathType,
                 currentStart,
                 currentEnd,
                 path,
+                Set.of(),
+                null,
+                false,
                 hideUnusedNodesCheckBox.isSelected()
         ));
+    }
+
+    private void syncPathStateToSelection() {
+        if (currentPathType() == PathType.INTERACTIVE) {
+            initializeInteractiveState();
+        } else {
+            interactivePath = new ArrayList<>();
+            interactivePending = null;
+            interactiveComplete = false;
+        }
+    }
+
+    private void initializeInteractiveState() {
+        interactivePath = new ArrayList<>();
+        if (currentStart != null) {
+            interactivePath.add(currentStart);
+        }
+        interactivePending = null;
+        interactiveComplete = currentStart != null && currentStart.equals(currentEnd);
+    }
+
+    private PathType currentPathType() {
+        return (PathType) pathTypeBox.getSelectedItem();
+    }
+
+    private void handleNodeClick(Point3D point) {
+        if (currentGrid == null
+                || currentPathType() != PathType.INTERACTIVE
+                || interactiveComplete) {
+            return;
+        }
+
+        Set<Point3D> frontier = getInteractiveFrontier();
+        if (!frontier.contains(point)) {
+            return;
+        }
+
+        if (point.equals(interactivePending)) {
+            interactivePath.add(point);
+            interactivePending = null;
+            interactiveComplete = point.equals(currentEnd);
+        } else {
+            interactivePending = point;
+        }
+
+        refreshDisplay();
+    }
+
+    private Set<Point3D> getInteractiveFrontier() {
+        if (currentGrid == null || interactivePath.isEmpty() || interactiveComplete) {
+            return Set.of();
+        }
+
+        Point3D anchor = interactivePath.get(interactivePath.size() - 1);
+        Set<Point3D> frontier = new HashSet<>();
+
+        for (Point3D neighbor : getNeighbors(anchor)) {
+            if (!interactivePath.contains(neighbor)) {
+                frontier.add(neighbor);
+            }
+        }
+
+        return frontier;
+    }
+
+    private List<Point3D> getNeighbors(Point3D point) {
+        List<Point3D> neighbors = new ArrayList<>();
+
+        int[][] directions = currentGrid.depth == 1
+                ? new int[][]{
+                {1, 0, 0},
+                {-1, 0, 0},
+                {0, 1, 0},
+                {0, -1, 0}
+        }
+                : new int[][]{
+                {1, 0, 0},
+                {-1, 0, 0},
+                {0, 1, 0},
+                {0, -1, 0},
+                {0, 0, 1},
+                {0, 0, -1}
+        };
+
+        for (int[] direction : directions) {
+            int nx = point.x + direction[0];
+            int ny = point.y + direction[1];
+            int nz = point.z + direction[2];
+
+            if (currentGrid.isInside(nx, ny, nz)) {
+                neighbors.add(new Point3D(nx, ny, nz));
+            }
+        }
+
+        return neighbors;
     }
 }

@@ -6,6 +6,30 @@ import java.util.Set;
 public class RenderUtils {
 
     public static Color getCellColor(RenderData data, Point3D p, Set<Point3D> pathSet) {
+        if (data.pathType == PathType.INTERACTIVE) {
+            if (p.equals(data.start)) {
+                return new Color(70, 190, 90);
+            }
+
+            if (p.equals(data.end)) {
+                return new Color(230, 75, 75);
+            }
+
+            if (p.equals(data.interactiveSelected)) {
+                return new Color(70, 190, 90);
+            }
+
+            if (pathSet.contains(p)) {
+                return new Color(75, 145, 235);
+            }
+
+            if (data.interactiveFrontier.contains(p)) {
+                return new Color(160, 160, 160);
+            }
+
+            return null;
+        }
+
         if (p.equals(data.start)) {
             return new Color(70, 190, 90);
         }
@@ -25,10 +49,31 @@ public class RenderUtils {
     }
 
     public static String getCellText(RenderData data, Point3D p) {
+        if (data.pathType == PathType.INTERACTIVE) {
+            if (p.equals(data.start)) return "S";
+            if (p.equals(data.end)) return "E";
+            if (p.equals(data.interactiveSelected)) return ">";
+            if (pathContains(data, p)) return "";
+            if (data.interactiveFrontier.contains(p)) return "";
+            return "";
+        }
+
         if (p.equals(data.start)) return "S";
         if (p.equals(data.end)) return "E";
 
         return String.valueOf(data.grid.weights[p.z][p.y][p.x]);
+    }
+
+    public static boolean isInteractiveVisible(RenderData data, Point3D p) {
+        return p.equals(data.start)
+                || p.equals(data.end)
+                || p.equals(data.interactiveSelected)
+                || pathContains(data, p)
+                || data.interactiveFrontier.contains(p);
+    }
+
+    public static boolean pathContains(RenderData data, Point3D p) {
+        return data.path.contains(p);
     }
 
     public static Color darken(Color color, double factor) {
