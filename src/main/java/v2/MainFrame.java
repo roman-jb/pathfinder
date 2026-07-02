@@ -235,7 +235,7 @@ public class MainFrame extends JFrame {
             return Set.of();
         }
 
-        Point3D anchor = interactivePath.get(interactivePath.size() - 1);
+        Point3D anchor = interactivePath.getLast();
         Set<Point3D> frontier = new HashSet<>();
 
         for (Point3D neighbor : getNeighbors(anchor)) {

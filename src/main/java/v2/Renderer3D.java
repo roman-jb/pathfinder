@@ -174,21 +174,7 @@ public class Renderer3D {
     private Cube createCube(Point3D p, Projection3D projection, double scale) {
         double size = Math.max(0.25, 0.72 * scale);
 
-        double x = p.x;
-        double y = p.y;
-        double z = p.z;
-
-        double[][] corners = {
-                {x - size / 2, y - size / 2, z - size / 2},
-                {x + size / 2, y - size / 2, z - size / 2},
-                {x + size / 2, y + size / 2, z - size / 2},
-                {x - size / 2, y + size / 2, z - size / 2},
-
-                {x - size / 2, y - size / 2, z + size / 2},
-                {x + size / 2, y - size / 2, z + size / 2},
-                {x + size / 2, y + size / 2, z + size / 2},
-                {x - size / 2, y + size / 2, z + size / 2}
-        };
+        double[][] corners = getDoubles(p, size);
 
         ProjectedPoint[] projected = new ProjectedPoint[8];
         double avgDepth = 0;
@@ -203,6 +189,24 @@ public class Renderer3D {
         return new Cube(p, projected, avgDepth);
     }
 
+    private static double[][] getDoubles(Point3D p, double size) {
+        double x = p.x;
+        double y = p.y;
+        double z = p.z;
+
+        return new double[][]{
+                {x - size / 2, y - size / 2, z - size / 2},
+                {x + size / 2, y - size / 2, z - size / 2},
+                {x + size / 2, y + size / 2, z - size / 2},
+                {x - size / 2, y + size / 2, z - size / 2},
+
+                {x - size / 2, y - size / 2, z + size / 2},
+                {x + size / 2, y - size / 2, z + size / 2},
+                {x + size / 2, y + size / 2, z + size / 2},
+                {x - size / 2, y + size / 2, z + size / 2}
+        };
+    }
+
     private void drawCube(
             Graphics2D g2,
             RenderData data,
@@ -213,6 +217,7 @@ public class Renderer3D {
     ) {
         Color base = RenderUtils.getCellColor(data, cube.point, pathSet);
 
+        assert base != null;
         drawFace(g2, cube, new int[]{0, 1, 2, 3}, RenderUtils.darken(base, 0.78));
         drawFace(g2, cube, new int[]{4, 5, 6, 7}, RenderUtils.brighten(base, 1.05));
         drawFace(g2, cube, new int[]{0, 1, 5, 4}, RenderUtils.brighten(base, 1.15));
@@ -309,7 +314,7 @@ public class Renderer3D {
         }
 
         if (data.interactiveSelected != null && !path.isEmpty()) {
-            Point3D lastConfirmed = path.get(path.size() - 1);
+            Point3D lastConfirmed = path.getLast();
             Point3D selected = data.interactiveSelected;
 
             g2.setStroke(new BasicStroke(

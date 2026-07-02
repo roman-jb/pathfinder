@@ -70,9 +70,7 @@ public class PathfindingApp extends JFrame {
         generateButton.addActionListener(e -> generateMatrix());
         rerollPointsButton.addActionListener(e -> rerollStartEnd());
 
-        mode3DCheckBox.addActionListener(e -> {
-            depthField.setEnabled(mode3DCheckBox.isSelected());
-        });
+        mode3DCheckBox.addActionListener(e -> depthField.setEnabled(mode3DCheckBox.isSelected()));
 
         pathTypeBox.addActionListener(e -> {
             if (currentGrid != null && currentStart != null && currentEnd != null) {
@@ -118,7 +116,7 @@ public class PathfindingApp extends JFrame {
     }
 
     private void rebuildPath() {
-        boolean cheapest = pathTypeBox.getSelectedItem().equals("Cheapest");
+        boolean cheapest = Objects.equals(pathTypeBox.getSelectedItem(), "Cheapest");
 
         List<Point3D> path = Pathfinder.findPath(
                 currentGrid,
@@ -141,27 +139,14 @@ public class PathfindingApp extends JFrame {
     }
 }
 
-class Point3D {
-    final int x;
-    final int y;
-    final int z;
-
-    Point3D(int x, int y, int z) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
-    }
+record Point3D(int x, int y, int z) {
 
     @Override
     public boolean equals(Object obj) {
-        if (!(obj instanceof Point3D other)) return false;
-        return x == other.x && y == other.y && z == other.z;
+        if (!(obj instanceof Point3D(int x1, int y1, int z1))) return false;
+        return x == x1 && y == y1 && z == z1;
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(x, y, z);
-    }
 }
 
 class Grid {
@@ -190,7 +175,7 @@ class Grid {
     }
 
     int getWeight(Point3D p) {
-        return weights[p.z][p.y][p.x];
+        return weights[p.z()][p.y()][p.x()];
     }
 
     int calculatePathCost(List<Point3D> path) {
@@ -250,7 +235,7 @@ class Pathfinder {
                 Comparator.comparingInt(n -> n.cost)
         );
 
-        dist[start.z][start.y][start.x] = 0;
+        dist[start.z()][start.y()][start.x()] = 0;
         queue.add(new Node(start, 0));
 
         int[][] directions = grid.depth == 1
@@ -275,12 +260,12 @@ class Pathfinder {
 
             if (p.equals(end)) break;
 
-            if (current.cost > dist[p.z][p.y][p.x]) continue;
+            if (current.cost > dist[p.z()][p.y()][p.x()]) continue;
 
             for (int[] d : directions) {
-                int nx = p.x + d[0];
-                int ny = p.y + d[1];
-                int nz = p.z + d[2];
+                int nx = p.x() + d[0];
+                int ny = p.y() + d[1];
+                int nz = p.z() + d[2];
 
                 if (!grid.isInside(nx, ny, nz)) continue;
 
@@ -290,7 +275,7 @@ class Pathfinder {
                         ? grid.getWeight(next)
                         : 1;
 
-                int newCost = dist[p.z][p.y][p.x] + stepCost;
+                int newCost = dist[p.z()][p.y()][p.x()] + stepCost;
 
                 if (newCost < dist[nz][ny][nx]) {
                     dist[nz][ny][nx] = newCost;
@@ -317,12 +302,12 @@ class Pathfinder {
 
             if (current.equals(start)) break;
 
-            current = previous[current.z][current.y][current.x];
+            current = previous[current.z()][current.y()][current.x()];
         }
 
         Collections.reverse(path);
 
-        if (path.isEmpty() || !path.get(0).equals(start)) {
+        if (path.isEmpty() || !path.getFirst().equals(start)) {
             return Collections.emptyList();
         }
 
@@ -490,7 +475,7 @@ class MatrixPanel extends JPanel {
     }
 
     private Sphere createSphere(Point3D p) {
-        ProjectedPoint projected = project(p.x, p.y, p.z);
+        ProjectedPoint projected = project(p.x(), p.y(), p.z());
         return new Sphere(p, projected);
     }
 
@@ -516,21 +501,7 @@ class MatrixPanel extends JPanel {
     private Cube createCube(Point3D p) {
         double size = Math.max(0.25, 0.72 * visualScale);
 
-        double x = p.x;
-        double y = p.y;
-        double z = p.z;
-
-        double[][] corners = {
-                {x - size / 2, y - size / 2, z - size / 2},
-                {x + size / 2, y - size / 2, z - size / 2},
-                {x + size / 2, y + size / 2, z - size / 2},
-                {x - size / 2, y + size / 2, z - size / 2},
-
-                {x - size / 2, y - size / 2, z + size / 2},
-                {x + size / 2, y - size / 2, z + size / 2},
-                {x + size / 2, y + size / 2, z + size / 2},
-                {x - size / 2, y + size / 2, z + size / 2}
-        };
+        double[][] corners = getDoubles(p, size);
 
         ProjectedPoint[] projected = new ProjectedPoint[8];
 
@@ -544,6 +515,24 @@ class MatrixPanel extends JPanel {
         avgDepth /= 8.0;
 
         return new Cube(p, projected, avgDepth);
+    }
+
+    private static double[][] getDoubles(Point3D p, double size) {
+        double x = p.x();
+        double y = p.y();
+        double z = p.z();
+
+        return new double[][]{
+                {x - size / 2, y - size / 2, z - size / 2},
+                {x + size / 2, y - size / 2, z - size / 2},
+                {x + size / 2, y + size / 2, z - size / 2},
+                {x - size / 2, y + size / 2, z - size / 2},
+
+                {x - size / 2, y - size / 2, z + size / 2},
+                {x + size / 2, y - size / 2, z + size / 2},
+                {x + size / 2, y + size / 2, z + size / 2},
+                {x - size / 2, y + size / 2, z + size / 2}
+        };
     }
 
     private void drawCube(Graphics2D g2, Cube cube) {
@@ -599,9 +588,9 @@ class MatrixPanel extends JPanel {
 
     private void draw3DLabel(Graphics2D g2, Cube cube) {
         ProjectedPoint center = project(
-                cube.point.x,
-                cube.point.y,
-                cube.point.z
+                cube.point.x(),
+                cube.point.y(),
+                cube.point.z()
         );
 
         String text = getCellText(cube.point);
@@ -631,8 +620,8 @@ class MatrixPanel extends JPanel {
             Point3D aPoint = pathList.get(i - 1);
             Point3D bPoint = pathList.get(i);
 
-            ProjectedPoint a = project(aPoint.x, aPoint.y, aPoint.z);
-            ProjectedPoint b = project(bPoint.x, bPoint.y, bPoint.z);
+            ProjectedPoint a = project(aPoint.x(), aPoint.y(), aPoint.z());
+            ProjectedPoint b = project(bPoint.x(), bPoint.y(), bPoint.z());
 
             g2.drawLine(a.screenX, a.screenY, b.screenX, b.screenY);
         }
@@ -653,7 +642,7 @@ class MatrixPanel extends JPanel {
             return new Color(75, 145, 235);
         }
 
-        int weight = grid.weights[p.z][p.y][p.x];
+        int weight = grid.weights[p.z()][p.y()][p.x()];
         int shade = 245 - weight * 14;
 
         return new Color(shade, shade, shade);
@@ -663,7 +652,7 @@ class MatrixPanel extends JPanel {
         if (p.equals(start)) return "S";
         if (p.equals(end)) return "E";
 
-        return String.valueOf(grid.weights[p.z][p.y][p.x]);
+        return String.valueOf(grid.weights[p.z()][p.y()][p.x()]);
     }
 
     private Color darken(Color color, double factor) {

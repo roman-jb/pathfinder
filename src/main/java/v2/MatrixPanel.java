@@ -6,7 +6,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Consumer;
 
 public class MatrixPanel extends JPanel {
@@ -24,8 +23,6 @@ public class MatrixPanel extends JPanel {
 
     private int lastMouseX;
     private int lastMouseY;
-    private int pressMouseX;
-    private int pressMouseY;
     private boolean dragged;
 
     public MatrixPanel() {
@@ -36,8 +33,6 @@ public class MatrixPanel extends JPanel {
             public void mousePressed(MouseEvent e) {
                 lastMouseX = e.getX();
                 lastMouseY = e.getY();
-                pressMouseX = e.getX();
-                pressMouseY = e.getY();
                 dragged = false;
             }
 

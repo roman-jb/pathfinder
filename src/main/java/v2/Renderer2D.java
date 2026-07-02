@@ -138,7 +138,7 @@ public class Renderer2D {
         }
 
         if (data.interactiveSelected != null && !path.isEmpty()) {
-            Point3D lastConfirmed = path.get(path.size() - 1);
+            Point3D lastConfirmed = path.getLast();
             Point3D selected = data.interactiveSelected;
 
             g2.setColor(new Color(70, 190, 90));
