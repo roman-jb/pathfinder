@@ -23,6 +23,10 @@ public class Renderer2D {
             for (int x = 0; x < grid.width; x++) {
                 Point3D p = new Point3D(x, y, 0);
 
+                if (data.hideUnusedNodes && !pathSet.contains(p)) {
+                    continue;
+                }
+
                 int drawX = startX + x * cellSize;
                 int drawY = startY + y * cellSize;
 

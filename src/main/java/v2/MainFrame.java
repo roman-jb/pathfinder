@@ -7,6 +7,7 @@ import java.util.List;
 public class MainFrame extends JFrame {
 
     private final JCheckBox mode3DCheckBox = new JCheckBox("3D mode");
+    private final JCheckBox hideUnusedNodesCheckBox = new JCheckBox("Hide unused nodes");
     private final JComboBox<PathType> pathTypeBox = new JComboBox<>(PathType.values());
 
     private final JTextField widthField = new JTextField("8", 4);
@@ -34,6 +35,7 @@ public class MainFrame extends JFrame {
         JPanel controls = new JPanel();
 
         controls.add(mode3DCheckBox);
+        controls.add(hideUnusedNodesCheckBox);
 
         controls.add(new JLabel("Path type:"));
         controls.add(pathTypeBox);
@@ -70,6 +72,10 @@ public class MainFrame extends JFrame {
         );
 
         pathTypeBox.addActionListener(e -> {
+            if (currentGrid != null) rebuildPath();
+        });
+
+        hideUnusedNodesCheckBox.addActionListener(e -> {
             if (currentGrid != null) rebuildPath();
         });
 
@@ -120,6 +126,12 @@ public class MainFrame extends JFrame {
         pathLengthLabel.setText("Length: " + Math.max(0, path.size() - 1));
         pathCostLabel.setText("Cost: " + currentGrid.calculatePathCost(path));
 
-        matrixPanel.setData(new RenderData(currentGrid, currentStart, currentEnd, path));
+        matrixPanel.setData(new RenderData(
+                currentGrid,
+                currentStart,
+                currentEnd,
+                path,
+                hideUnusedNodesCheckBox.isSelected()
+        ));
     }
 }

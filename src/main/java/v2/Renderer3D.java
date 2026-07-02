@@ -15,7 +15,7 @@ public class Renderer3D {
             int panelWidth,
             int panelHeight
     ) {
-        drawLegend(g2);
+        drawLegend(g2, data.hideUnusedNodes);
 
         Set<Point3D> pathSet = new HashSet<>(data.path);
 
@@ -40,7 +40,7 @@ public class Renderer3D {
 
                     if (pathSet.contains(p)) {
                         pathCubes.add(createCube(p, projection, scale));
-                    } else {
+                    } else if (!data.hideUnusedNodes) {
                         spheres.add(new Sphere(p, projection.project(p.x, p.y, p.z)));
                     }
                 }
@@ -61,11 +61,17 @@ public class Renderer3D {
         }
     }
 
-    private void drawLegend(Graphics2D g2) {
+    private void drawLegend(Graphics2D g2, boolean hideUnusedNodes) {
         g2.setFont(new Font("Arial", Font.BOLD, 14));
         g2.setColor(Color.BLACK);
         g2.drawString("3D mode: drag mouse to rotate", 20, 25);
-        g2.drawString("Small gray spheres = unused cells", 20, 45);
+        g2.drawString(
+                hideUnusedNodes
+                        ? "Unused cells hidden"
+                        : "Small gray spheres = unused cells",
+                20,
+                45
+        );
         g2.drawString("Green = Start, Red = End, Blue = Path", 20, 65);
     }
 
