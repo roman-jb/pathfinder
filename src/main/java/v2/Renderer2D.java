@@ -80,31 +80,45 @@ public class Renderer2D {
                     int drawY = startY + y * cellSize;
 
                     Color color = RenderUtils.getCellColor(data, p, pathSet);
-                    if (color == null) {
-                        continue;
-                    }
-
-                    if (p.equals(data.start) || pathSet.contains(p)) {
-                        g2.setColor(color);
-                        g2.fillRect(drawX, drawY, cellSize, cellSize);
-                        g2.setColor(Color.BLACK);
-                        g2.drawRect(drawX, drawY, cellSize, cellSize);
-                    } else {
+                    if (RenderUtils.isInteractiveBox(data, p)) {
                         String label = RenderUtils.getCellText(data, p);
-                        drawInteractiveSphere(g2, drawX, drawY, cellSize, color, label);
+                        drawInteractiveNode(
+                                g2,
+                                drawX,
+                                drawY,
+                                cellSize,
+                                color,
+                                label,
+                                RenderUtils.getInteractiveSizeFactor(data, p),
+                                true
+                        );
+                    } else if (RenderUtils.isInteractiveSphere(data, p)) {
+                        String label = RenderUtils.getCellText(data, p);
+                        drawInteractiveNode(
+                                g2,
+                                drawX,
+                                drawY,
+                                cellSize,
+                                color,
+                                label,
+                                RenderUtils.getInteractiveSizeFactor(data, p),
+                                false
+                        );
                     }
                 }
             }
         }
     }
 
-    private void drawInteractiveSphere(
+    private void drawInteractiveNode(
             Graphics2D g2,
             int drawX,
             int drawY,
             int cellSize,
             Color color,
-            String label
+            String label,
+            double sizeFactor,
+            boolean box
     ) {
         int baseInset = Math.max(4, cellSize / 6);
         int baseSize = cellSize - baseInset * 2;
@@ -116,20 +130,30 @@ public class Renderer2D {
 
         int labelWidth = label == null ? 0 : fm.stringWidth(label);
         int labelHeight = label == null ? 0 : fm.getHeight();
-        int size = Math.max(baseSize, Math.max(labelWidth, labelHeight) + 10);
-        size = Math.min(size, cellSize + Math.max(4, cellSize / 4));
+        int size = Math.max((int) (baseSize * sizeFactor), Math.max(labelWidth, labelHeight) + 10);
+        size = Math.min(size, cellSize);
 
         int inset = Math.max(0, (cellSize - size) / 2);
 
         g2.setColor(color);
-        g2.fillOval(drawX + inset, drawY + inset, size, size);
+        if (box) {
+            g2.fillRect(drawX + inset, drawY + inset, size, size);
+        } else {
+            g2.fillOval(drawX + inset, drawY + inset, size, size);
+        }
 
         g2.setColor(new Color(80, 80, 80, 160));
-        g2.drawOval(drawX + inset, drawY + inset, size, size);
+        if (box) {
+            g2.drawRect(drawX + inset, drawY + inset, size, size);
+        } else {
+            g2.drawOval(drawX + inset, drawY + inset, size, size);
+        }
 
         int highlightSize = Math.max(2, size / 3);
         g2.setColor(new Color(255, 255, 255, 110));
-        g2.fillOval(drawX + inset + size / 5, drawY + inset + size / 5, highlightSize, highlightSize);
+        if (!box) {
+            g2.fillOval(drawX + inset + size / 5, drawY + inset + size / 5, highlightSize, highlightSize);
+        }
 
         if (label != null && !label.isBlank()) {
             g2.setColor(Color.BLACK);

@@ -46,14 +46,20 @@ public class Renderer3D {
                 for (int x = 0; x < grid.width; x++) {
                     Point3D p = new Point3D(x, y, z);
 
-                    if (pathSet.contains(p)) {
-                        pathCubes.add(createCube(p, projection, scale));
-                    } else if (!data.hideUnusedNodes) {
+                    if (pathSet.contains(p) || RenderUtils.isInteractiveBox(data, p)) {
+                        pathCubes.add(createCube(
+                                p,
+                                projection,
+                                scale,
+                                RenderUtils.getInteractiveSizeFactor(data, p)
+                        ));
+                    } else if (RenderUtils.isInteractiveSphere(data, p)) {
                         spheres.add(new Sphere(
                                 p,
                                 projection.project(p.x, p.y, p.z),
                                 RenderUtils.getCellColor(data, p, pathSet),
-                                RenderUtils.getCellText(data, p)
+                                RenderUtils.getCellText(data, p),
+                                RenderUtils.getInteractiveSizeFactor(data, p)
                         ));
                     }
                 }
@@ -103,14 +109,20 @@ public class Renderer3D {
                     Point3D p = new Point3D(x, y, z);
 
                     if (RenderUtils.isInteractiveVisible(data, p)) {
-                        if (pathSet.contains(p)) {
-                            pathCubes.add(createCube(p, projection, scale));
-                        } else {
+                        if (pathSet.contains(p) || RenderUtils.isInteractiveBox(data, p)) {
+                            pathCubes.add(createCube(
+                                    p,
+                                    projection,
+                                    scale,
+                                    RenderUtils.getInteractiveSizeFactor(data, p)
+                            ));
+                        } else if (RenderUtils.isInteractiveSphere(data, p)) {
                             spheres.add(new Sphere(
                                     p,
                                     projection.project(p.x, p.y, p.z),
                                     RenderUtils.getCellColor(data, p, pathSet),
-                                    RenderUtils.getCellText(data, p)
+                                    RenderUtils.getCellText(data, p),
+                                    RenderUtils.getInteractiveSizeFactor(data, p)
                             ));
                         }
                     }
@@ -137,8 +149,8 @@ public class Renderer3D {
         g2.setColor(Color.BLACK);
         g2.drawString("3D mode: drag mouse to rotate", 20, 25);
         if (data.pathType == PathType.INTERACTIVE) {
-            g2.drawString("Click gray spheres, then click again to confirm", 20, 45);
-            g2.drawString("Green = active step, Blue = confirmed path", 20, 65);
+            g2.drawString("Surface nodes are boxes; interior nodes are spheres", 20, 45);
+            g2.drawString("Green = selectable, Black = unused, Blue = confirmed path", 20, 65);
         } else {
             g2.drawString(
                     data.hideUnusedNodes
@@ -154,7 +166,7 @@ public class Renderer3D {
     private void drawSphere(Graphics2D g2, Sphere sphere, double scale) {
         ProjectedPoint projected = sphere.projected;
 
-        int baseSize = Math.max(3, (int) (12 * projected.scale * scale));
+        int baseSize = Math.max(3, (int) (12 * projected.scale * scale * sphere.sizeFactor));
         int size = baseSize;
         Font font;
         FontMetrics fm = null;
@@ -194,8 +206,8 @@ public class Renderer3D {
         }
     }
 
-    private Cube createCube(Point3D p, Projection3D projection, double scale) {
-        double size = Math.max(0.25, 0.72 * scale);
+    private Cube createCube(Point3D p, Projection3D projection, double scale, double sizeFactor) {
+        double size = Math.max(0.05, (12.0 / 62.0) * sizeFactor);
 
         double[][] corners = getDoubles(p, size);
 
@@ -209,7 +221,7 @@ public class Renderer3D {
 
         avgDepth /= 8.0;
 
-        return new Cube(p, projected, avgDepth);
+        return new Cube(p, projected, avgDepth, sizeFactor);
     }
 
     private static double[][] getDoubles(Point3D p, double size) {
@@ -240,7 +252,6 @@ public class Renderer3D {
     ) {
         Color base = RenderUtils.getCellColor(data, cube.point, pathSet);
 
-        assert base != null;
         drawFace(g2, cube, new int[]{0, 1, 2, 3}, RenderUtils.darken(base, 0.78));
         drawFace(g2, cube, new int[]{4, 5, 6, 7}, RenderUtils.brighten(base, 1.05));
         drawFace(g2, cube, new int[]{0, 1, 5, 4}, RenderUtils.brighten(base, 1.15));
@@ -248,7 +259,7 @@ public class Renderer3D {
         drawFace(g2, cube, new int[]{1, 2, 6, 5}, base);
         drawFace(g2, cube, new int[]{0, 3, 7, 4}, RenderUtils.darken(base, 0.88));
 
-        drawCubeEdges(g2, cube, scale);
+        drawCubeEdges(g2, cube, scale * cube.sizeFactor);
 
         if (scale >= 0.45) {
             draw3DLabel(g2, data, cube, scale, projection);

@@ -24,10 +24,10 @@ public class RenderUtils {
             }
 
             if (data.interactiveFrontier.contains(p)) {
-                return new Color(160, 160, 160);
+                return new Color(70, 190, 90);
             }
 
-            return null;
+            return new Color(120, 120, 120, 150);
         }
 
         if (p.equals(data.start)) {
@@ -67,11 +67,44 @@ public class RenderUtils {
     }
 
     public static boolean isInteractiveVisible(RenderData data, Point3D p) {
+        return isInteractiveSpecial(data, p) || !data.hideUnusedNodes;
+    }
+
+    public static boolean isSurfaceNode(Grid grid, Point3D p) {
+        return p.x == 0
+                || p.y == 0
+                || p.z == 0
+                || p.x == grid.width - 1
+                || p.y == grid.height - 1
+                || p.z == grid.depth - 1;
+    }
+
+    public static boolean isInteractiveBox(RenderData data, Point3D p) {
+        if (data.pathType != PathType.INTERACTIVE) {
+            return false;
+        }
+
+        return isSurfaceNode(data.grid, p) && isInteractiveVisible(data, p);
+    }
+
+    public static boolean isInteractiveSphere(RenderData data, Point3D p) {
+        if (data.pathType != PathType.INTERACTIVE) {
+            return false;
+        }
+
+        return !isSurfaceNode(data.grid, p) && isInteractiveVisible(data, p);
+    }
+
+    public static boolean isInteractiveSpecial(RenderData data, Point3D p) {
         return p.equals(data.start)
                 || p.equals(data.end)
                 || p.equals(data.interactiveSelected)
                 || pathContains(data, p)
                 || data.interactiveFrontier.contains(p);
+    }
+
+    public static double getInteractiveSizeFactor(RenderData data, Point3D p) {
+        return isInteractiveSpecial(data, p) ? 1.0 : 0.5;
     }
 
     public static boolean pathContains(RenderData data, Point3D p) {

@@ -7,11 +7,13 @@ import java.awt.event.MouseEvent;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 public class MatrixPanel extends JPanel {
 
     private RenderData data;
     private Consumer<Point3D> clickHandler;
+    private IntConsumer wheelHandler;
 
     private final Renderer2D renderer2D = new Renderer2D();
     private final Renderer3D renderer3D = new Renderer3D();
@@ -64,10 +66,19 @@ public class MatrixPanel extends JPanel {
 
         addMouseListener(mouseAdapter);
         addMouseMotionListener(mouseAdapter);
+        addMouseWheelListener(e -> {
+            if (wheelHandler != null) {
+                wheelHandler.accept(e.getWheelRotation());
+            }
+        });
     }
 
     public void setClickHandler(Consumer<Point3D> clickHandler) {
         this.clickHandler = clickHandler;
+    }
+
+    public void setWheelHandler(IntConsumer wheelHandler) {
+        this.wheelHandler = wheelHandler;
     }
 
     public void setData(RenderData data) {

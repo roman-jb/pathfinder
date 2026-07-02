@@ -71,6 +71,12 @@ public class MainFrame extends JFrame {
         add(matrixPanel, BorderLayout.CENTER);
 
         matrixPanel.setClickHandler(this::handleNodeClick);
+        matrixPanel.setWheelHandler(notches -> {
+            int step = Math.max(1, scaleSlider.getMinorTickSpacing());
+            int delta = -notches * step;
+            int value = Math.max(scaleSlider.getMinimum(), Math.min(scaleSlider.getMaximum(), scaleSlider.getValue() + delta));
+            scaleSlider.setValue(value);
+        });
 
         generateButton.addActionListener(e -> generateMatrix());
         rerollPointsButton.addActionListener(e -> rerollStartEnd());
@@ -97,7 +103,7 @@ public class MainFrame extends JFrame {
         );
 
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setSize(1100, 850);
+        setSize(1600, 900);
         setLocationRelativeTo(null);
         setVisible(true);
     }
