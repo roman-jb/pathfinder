@@ -75,33 +75,51 @@ public class Renderer2D {
             for (int x = 0; x < grid.width; x++) {
                 Point3D p = new Point3D(x, y, 0);
 
-                if (!RenderUtils.isInteractiveVisible(data, p)) {
-                    continue;
-                }
+                if (RenderUtils.isInteractiveVisible(data, p)) {
+                    int drawX = startX + x * cellSize;
+                    int drawY = startY + y * cellSize;
 
-                int drawX = startX + x * cellSize;
-                int drawY = startY + y * cellSize;
+                    Color color = RenderUtils.getCellColor(data, p, pathSet);
+                    if (color == null) {
+                        continue;
+                    }
 
-                Color color = RenderUtils.getCellColor(data, p, pathSet);
-                if (color == null) {
-                    continue;
-                }
-
-                if (p.equals(data.start) || pathSet.contains(p)) {
-                    g2.setColor(color);
-                    g2.fillRect(drawX, drawY, cellSize, cellSize);
-                    g2.setColor(Color.BLACK);
-                    g2.drawRect(drawX, drawY, cellSize, cellSize);
-                } else {
-                    drawInteractiveSphere(g2, drawX, drawY, cellSize, color);
+                    if (p.equals(data.start) || pathSet.contains(p)) {
+                        g2.setColor(color);
+                        g2.fillRect(drawX, drawY, cellSize, cellSize);
+                        g2.setColor(Color.BLACK);
+                        g2.drawRect(drawX, drawY, cellSize, cellSize);
+                    } else {
+                        String label = RenderUtils.getCellText(data, p);
+                        drawInteractiveSphere(g2, drawX, drawY, cellSize, color, label);
+                    }
                 }
             }
         }
     }
 
-    private void drawInteractiveSphere(Graphics2D g2, int drawX, int drawY, int cellSize, Color color) {
-        int inset = Math.max(4, cellSize / 6);
-        int size = cellSize - inset * 2;
+    private void drawInteractiveSphere(
+            Graphics2D g2,
+            int drawX,
+            int drawY,
+            int cellSize,
+            Color color,
+            String label
+    ) {
+        int baseInset = Math.max(4, cellSize / 6);
+        int baseSize = cellSize - baseInset * 2;
+
+        int fontSize = Math.max(9, (int) (14 * scaleForCell(cellSize)));
+        Font font = new Font("Arial", Font.BOLD, fontSize);
+        g2.setFont(font);
+        FontMetrics fm = g2.getFontMetrics();
+
+        int labelWidth = label == null ? 0 : fm.stringWidth(label);
+        int labelHeight = label == null ? 0 : fm.getHeight();
+        int size = Math.max(baseSize, Math.max(labelWidth, labelHeight) + 10);
+        size = Math.min(size, cellSize + Math.max(4, cellSize / 4));
+
+        int inset = Math.max(0, (cellSize - size) / 2);
 
         g2.setColor(color);
         g2.fillOval(drawX + inset, drawY + inset, size, size);
@@ -112,6 +130,17 @@ public class Renderer2D {
         int highlightSize = Math.max(2, size / 3);
         g2.setColor(new Color(255, 255, 255, 110));
         g2.fillOval(drawX + inset + size / 5, drawY + inset + size / 5, highlightSize, highlightSize);
+
+        if (label != null && !label.isBlank()) {
+            g2.setColor(Color.BLACK);
+            int textX = drawX + (cellSize - fm.stringWidth(label)) / 2;
+            int textY = drawY + ((cellSize - fm.getHeight()) / 2) + fm.getAscent();
+            g2.drawString(label, textX, textY);
+        }
+    }
+
+    private double scaleForCell(int cellSize) {
+        return Math.clamp(cellSize / 45.0, 0.65, 1.35);
     }
 
     private void drawInteractiveLinks(

@@ -54,7 +54,9 @@ public class RenderUtils {
             if (p.equals(data.end)) return "E";
             if (p.equals(data.interactiveSelected)) return ">";
             if (pathContains(data, p)) return "";
-            if (data.interactiveFrontier.contains(p)) return "";
+            if (data.interactiveFrontier.contains(p)) {
+                return String.valueOf(data.grid.weights[p.z][p.y][p.x]);
+            }
             return "";
         }
 
