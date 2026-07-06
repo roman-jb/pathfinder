@@ -28,6 +28,7 @@ public class Renderer3D {
         }
 
         List<Sphere> spheres = new ArrayList<>();
+        List<Cube> unusedCubes = new ArrayList<>();
         List<Cube> pathCubes = new ArrayList<>();
 
         Grid grid = data.grid;
@@ -46,27 +47,37 @@ public class Renderer3D {
                 for (int x = 0; x < grid.width; x++) {
                     Point3D p = new Point3D(x, y, z);
 
-                    if (pathSet.contains(p) || RenderUtils.isInteractiveBox(data, p)) {
+                    if (pathSet.contains(p)) {
                         pathCubes.add(createCube(
                                 p,
                                 projection,
                                 scale,
-                                RenderUtils.getInteractiveSizeFactor(data, p)
+                                1.0
                         ));
-                    } else if (RenderUtils.isInteractiveSphere(data, p)) {
-                        spheres.add(new Sphere(
-                                p,
-                                projection.project(p.x, p.y, p.z),
-                                RenderUtils.getCellColor(data, p, pathSet),
-                                RenderUtils.getCellText(data, p),
-                                RenderUtils.getInteractiveSizeFactor(data, p)
-                        ));
+                    } else if (!data.hideUnusedNodes) {
+                        if (RenderUtils.isSurfaceNode(grid, p)) {
+                            unusedCubes.add(createCube(
+                                    p,
+                                    projection,
+                                    scale,
+                                    0.5
+                            ));
+                        } else {
+                            spheres.add(new Sphere(
+                                    p,
+                                    projection.project(p.x, p.y, p.z),
+                                    new Color(120, 120, 120, 150),
+                                    null,
+                                    0.5
+                            ));
+                        }
                     }
                 }
             }
         }
 
         spheres.sort(Comparator.comparingDouble(s -> s.projected.depth));
+        unusedCubes.sort(Comparator.comparingDouble(c -> c.depth));
         pathCubes.sort(Comparator.comparingDouble(c -> c.depth));
 
         for (Sphere sphere : spheres) {
@@ -74,6 +85,10 @@ public class Renderer3D {
         }
 
         drawPathLines(g2, data.path, projection, scale);
+
+        for (Cube cube : unusedCubes) {
+            drawCube(g2, cube, new Color(120, 120, 120, 150), null, scale, projection);
+        }
 
         for (Cube cube : pathCubes) {
             drawCube(g2, data, cube, pathSet, scale, projection);
@@ -155,7 +170,7 @@ public class Renderer3D {
             g2.drawString(
                     data.hideUnusedNodes
                             ? "Unused cells hidden"
-                            : "Small gray spheres = unused cells",
+                            : "Small gray cubes/spheres = unused cells",
                     20,
                     45
             );
@@ -251,6 +266,18 @@ public class Renderer3D {
             Projection3D projection
     ) {
         Color base = RenderUtils.getCellColor(data, cube.point, pathSet);
+        String label = RenderUtils.getCellText(data, cube.point);
+        drawCube(g2, cube, base, label, scale, projection);
+    }
+
+    private void drawCube(
+            Graphics2D g2,
+            Cube cube,
+            Color base,
+            String label,
+            double scale,
+            Projection3D projection
+    ) {
 
         drawFace(g2, cube, new int[]{0, 1, 2, 3}, RenderUtils.darken(base, 0.78));
         drawFace(g2, cube, new int[]{4, 5, 6, 7}, RenderUtils.brighten(base, 1.05));
@@ -261,8 +288,8 @@ public class Renderer3D {
 
         drawCubeEdges(g2, cube, scale * cube.sizeFactor);
 
-        if (scale >= 0.45) {
-            draw3DLabel(g2, data, cube, scale, projection);
+        if (scale >= 0.45 && label != null && !label.isBlank()) {
+            draw3DLabel(g2, cube, label, scale, projection);
         }
     }
 
@@ -302,8 +329,8 @@ public class Renderer3D {
 
     private void draw3DLabel(
             Graphics2D g2,
-            RenderData data,
             Cube cube,
+            String text,
             double scale,
             Projection3D projection
     ) {
@@ -312,8 +339,6 @@ public class Renderer3D {
                 cube.point.y,
                 cube.point.z
         );
-
-        String text = RenderUtils.getCellText(data, cube.point);
 
         g2.setFont(new Font("Arial", Font.BOLD, Math.max(8, (int) (16 * scale))));
         FontMetrics fm = g2.getFontMetrics();
