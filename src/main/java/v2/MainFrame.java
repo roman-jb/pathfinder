@@ -74,7 +74,7 @@ public class MainFrame extends JFrame {
         matrixPanel.setWheelHandler(notches -> {
             int step = Math.max(1, scaleSlider.getMinorTickSpacing());
             int delta = -notches * step;
-            int value = Math.max(scaleSlider.getMinimum(), Math.min(scaleSlider.getMaximum(), scaleSlider.getValue() + delta));
+            int value = Math.clamp(scaleSlider.getValue() + delta, scaleSlider.getMinimum(), scaleSlider.getMaximum());
             scaleSlider.setValue(value);
         });
 
