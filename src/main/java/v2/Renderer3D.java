@@ -3,11 +3,33 @@ package v2;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 public class Renderer3D {
+
+    private static final Font LEGEND_FONT = new Font("Arial", Font.BOLD, 14);
+    private static final Color UNUSED_NODE_COLOR = new Color(120, 120, 120, 150);
+    private static final Color UNUSED_NODE_OUTLINE = new Color(80, 80, 80, 120);
+    private static final Color SPHERE_HIGHLIGHT = new Color(255, 255, 255, 120);
+    private static final Color FACE_OUTLINE = new Color(30, 30, 30, 90);
+    private static final Color EDGE_COLOR = new Color(20, 20, 20, 100);
+    private static final Color PATH_LINE_COLOR = new Color(20, 80, 220, 190);
+    private static final Color INTERACTIVE_LINE_COLOR = new Color(75, 145, 235, 190);
+    private static final Color INTERACTIVE_LINK_COLOR = new Color(70, 190, 90, 190);
+    private static final int[][] CUBE_FACES = {
+            {0, 1, 2, 3},
+            {4, 5, 6, 7},
+            {0, 1, 5, 4},
+            {2, 3, 7, 6},
+            {1, 2, 6, 5},
+            {0, 3, 7, 4}
+    };
+    private static final int[][] CUBE_EDGES = {
+            {0, 1}, {1, 2}, {2, 3}, {3, 0},
+            {4, 5}, {5, 6}, {6, 7}, {7, 4},
+            {0, 4}, {1, 5}, {2, 6}, {3, 7}
+    };
 
     public void draw(
             Graphics2D g2,
@@ -20,7 +42,7 @@ public class Renderer3D {
     ) {
         drawLegend(g2, data);
 
-        Set<Point3D> pathSet = new HashSet<>(data.path);
+        Set<Point3D> pathSet = data.pathSet;
 
         if (data.pathType == PathType.INTERACTIVE) {
             drawInteractive(g2, data, scale, angleX, angleY, panelWidth, panelHeight, pathSet);
@@ -51,7 +73,6 @@ public class Renderer3D {
                         pathCubes.add(createCube(
                                 p,
                                 projection,
-                                scale,
                                 1.0
                         ));
                     } else if (!data.hideUnusedNodes) {
@@ -59,14 +80,13 @@ public class Renderer3D {
                             unusedCubes.add(createCube(
                                     p,
                                     projection,
-                                    scale,
                                     0.5
                             ));
                         } else {
                             spheres.add(new Sphere(
                                     p,
                                     projection.project(p.x, p.y, p.z),
-                                    new Color(120, 120, 120, 150),
+                                    UNUSED_NODE_COLOR,
                                     null,
                                     0.5
                             ));
@@ -87,7 +107,7 @@ public class Renderer3D {
         drawPathLines(g2, data.path, projection, scale);
 
         for (Cube cube : unusedCubes) {
-            drawCube(g2, cube, new Color(120, 120, 120, 150), null, scale, projection);
+            drawCube(g2, cube, UNUSED_NODE_COLOR, null, scale, projection);
         }
 
         for (Cube cube : pathCubes) {
@@ -128,7 +148,6 @@ public class Renderer3D {
                             pathCubes.add(createCube(
                                     p,
                                     projection,
-                                    scale,
                                     RenderUtils.getInteractiveSizeFactor(data, p)
                             ));
                         } else if (RenderUtils.isInteractiveSphere(data, p)) {
@@ -160,7 +179,7 @@ public class Renderer3D {
     }
 
     private void drawLegend(Graphics2D g2, RenderData data) {
-        g2.setFont(new Font("Arial", Font.BOLD, 14));
+        g2.setFont(LEGEND_FONT);
         g2.setColor(Color.BLACK);
         g2.drawString("3D mode: drag mouse to rotate", 20, 25);
         if (data.pathType == PathType.INTERACTIVE) {
@@ -201,16 +220,16 @@ public class Renderer3D {
         Color fill = sphere.color != null ? sphere.color : new Color(155, 155, 155, 135);
         Color outline = sphere.color != null
                 ? RenderUtils.darken(sphere.color, 0.72)
-                : new Color(80, 80, 80, 120);
+                : UNUSED_NODE_OUTLINE;
 
-        g2.setColor(new Color(fill.getRed(), fill.getGreen(), fill.getBlue(), fill.getAlpha()));
+        g2.setColor(fill);
         g2.fillOval(x, y, size, size);
 
-        g2.setColor(new Color(outline.getRed(), outline.getGreen(), outline.getBlue(), outline.getAlpha()));
+        g2.setColor(outline);
         g2.drawOval(x, y, size, size);
 
         int highlightSize = Math.max(2, size / 3);
-        g2.setColor(new Color(255, 255, 255, 120));
+        g2.setColor(SPHERE_HIGHLIGHT);
         g2.fillOval(x + size / 5, y + size / 5, highlightSize, highlightSize);
 
         if (sphere.label != null && !sphere.label.isBlank() && fm != null) {
@@ -221,40 +240,32 @@ public class Renderer3D {
         }
     }
 
-    private Cube createCube(Point3D p, Projection3D projection, double scale, double sizeFactor) {
+    private Cube createCube(Point3D p, Projection3D projection, double sizeFactor) {
         double size = Math.max(0.05, (12.0 / 62.0) * sizeFactor);
-
-        double[][] corners = getDoubles(p, size);
+        double half = size / 2.0;
+        double x = p.x;
+        double y = p.y;
+        double z = p.z;
 
         ProjectedPoint[] projected = new ProjectedPoint[8];
         double avgDepth = 0;
 
-        for (int i = 0; i < corners.length; i++) {
-            projected[i] = projection.project(corners[i][0], corners[i][1], corners[i][2]);
-            avgDepth += projected[i].depth;
+        projected[0] = projection.project(x - half, y - half, z - half);
+        projected[1] = projection.project(x + half, y - half, z - half);
+        projected[2] = projection.project(x + half, y + half, z - half);
+        projected[3] = projection.project(x - half, y + half, z - half);
+        projected[4] = projection.project(x - half, y - half, z + half);
+        projected[5] = projection.project(x + half, y - half, z + half);
+        projected[6] = projection.project(x + half, y + half, z + half);
+        projected[7] = projection.project(x - half, y + half, z + half);
+
+        for (ProjectedPoint point : projected) {
+            avgDepth += point.depth;
         }
 
         avgDepth /= 8.0;
 
         return new Cube(p, projected, avgDepth, sizeFactor);
-    }
-
-    private static double[][] getDoubles(Point3D p, double size) {
-        double x = p.x;
-        double y = p.y;
-        double z = p.z;
-
-        return new double[][]{
-                {x - size / 2, y - size / 2, z - size / 2},
-                {x + size / 2, y - size / 2, z - size / 2},
-                {x + size / 2, y + size / 2, z - size / 2},
-                {x - size / 2, y + size / 2, z - size / 2},
-
-                {x - size / 2, y - size / 2, z + size / 2},
-                {x + size / 2, y - size / 2, z + size / 2},
-                {x + size / 2, y + size / 2, z + size / 2},
-                {x - size / 2, y + size / 2, z + size / 2}
-        };
     }
 
     private void drawCube(
@@ -279,12 +290,12 @@ public class Renderer3D {
             Projection3D projection
     ) {
 
-        drawFace(g2, cube, new int[]{0, 1, 2, 3}, RenderUtils.darken(base, 0.78));
-        drawFace(g2, cube, new int[]{4, 5, 6, 7}, RenderUtils.brighten(base, 1.05));
-        drawFace(g2, cube, new int[]{0, 1, 5, 4}, RenderUtils.brighten(base, 1.15));
-        drawFace(g2, cube, new int[]{2, 3, 7, 6}, RenderUtils.darken(base, 0.7));
-        drawFace(g2, cube, new int[]{1, 2, 6, 5}, base);
-        drawFace(g2, cube, new int[]{0, 3, 7, 4}, RenderUtils.darken(base, 0.88));
+        drawFace(g2, cube, CUBE_FACES[0], RenderUtils.darken(base, 0.78));
+        drawFace(g2, cube, CUBE_FACES[1], RenderUtils.brighten(base, 1.05));
+        drawFace(g2, cube, CUBE_FACES[2], RenderUtils.brighten(base, 1.15));
+        drawFace(g2, cube, CUBE_FACES[3], RenderUtils.darken(base, 0.7));
+        drawFace(g2, cube, CUBE_FACES[4], base);
+        drawFace(g2, cube, CUBE_FACES[5], RenderUtils.darken(base, 0.88));
 
         drawCubeEdges(g2, cube, scale * cube.sizeFactor);
 
@@ -306,21 +317,15 @@ public class Renderer3D {
         g2.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 220));
         g2.fillPolygon(polygon);
 
-        g2.setColor(new Color(30, 30, 30, 90));
+        g2.setColor(FACE_OUTLINE);
         g2.drawPolygon(polygon);
     }
 
     private void drawCubeEdges(Graphics2D g2, Cube cube, double scale) {
-        int[][] edges = {
-                {0, 1}, {1, 2}, {2, 3}, {3, 0},
-                {4, 5}, {5, 6}, {6, 7}, {7, 4},
-                {0, 4}, {1, 5}, {2, 6}, {3, 7}
-        };
-
         g2.setStroke(new BasicStroke(Math.max(0.5f, (float) scale)));
-        g2.setColor(new Color(20, 20, 20, 100));
+        g2.setColor(EDGE_COLOR);
 
-        for (int[] edge : edges) {
+        for (int[] edge : CUBE_EDGES) {
             ProjectedPoint a = cube.points[edge[0]];
             ProjectedPoint b = cube.points[edge[1]];
             g2.drawLine(a.screenX, a.screenY, b.screenX, b.screenY);
@@ -359,7 +364,7 @@ public class Renderer3D {
                     BasicStroke.CAP_ROUND,
                     BasicStroke.JOIN_ROUND
             ));
-            g2.setColor(new Color(75, 145, 235, 190));
+            g2.setColor(INTERACTIVE_LINE_COLOR);
 
             for (int i = 1; i < path.size(); i++) {
                 Point3D aPoint = path.get(i - 1);
@@ -381,7 +386,7 @@ public class Renderer3D {
                     BasicStroke.CAP_ROUND,
                     BasicStroke.JOIN_ROUND
             ));
-            g2.setColor(new Color(70, 190, 90, 190));
+            g2.setColor(INTERACTIVE_LINK_COLOR);
 
             ProjectedPoint a = projection.project(lastConfirmed.x, lastConfirmed.y, lastConfirmed.z);
             ProjectedPoint b = projection.project(selected.x, selected.y, selected.z);
@@ -405,7 +410,7 @@ public class Renderer3D {
                 BasicStroke.JOIN_ROUND
         ));
 
-        g2.setColor(new Color(20, 80, 220, 190));
+        g2.setColor(PATH_LINE_COLOR);
 
         for (int i = 1; i < path.size(); i++) {
             Point3D aPoint = path.get(i - 1);

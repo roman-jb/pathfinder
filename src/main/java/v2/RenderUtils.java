@@ -108,7 +108,7 @@ public class RenderUtils {
     }
 
     public static boolean pathContains(RenderData data, Point3D p) {
-        return data.path.contains(p);
+        return data.pathSet.contains(p);
     }
 
     public static Color darken(Color color, double factor) {

@@ -11,6 +11,7 @@ public class RenderData {
     public final Point3D start;
     public final Point3D end;
     public final List<Point3D> path;
+    public final Set<Point3D> pathSet;
     public final Set<Point3D> interactiveFrontier;
     public final Point3D interactiveSelected;
     public final boolean interactiveComplete;
@@ -32,6 +33,9 @@ public class RenderData {
         this.start = start;
         this.end = end;
         this.path = path;
+        this.pathSet = path == null
+                ? Collections.emptySet()
+                : Collections.unmodifiableSet(new HashSet<>(path));
         this.interactiveFrontier = interactiveFrontier == null
                 ? Collections.emptySet()
                 : Collections.unmodifiableSet(new HashSet<>(interactiveFrontier));

@@ -2,12 +2,16 @@ package v2;
 
 public class Projection3D {
 
-    private final Grid grid;
-    private final double visualScale;
-    private final double angleX;
-    private final double angleY;
     private final int panelWidth;
     private final int panelHeight;
+    private final double centerX;
+    private final double centerY;
+    private final double centerZ;
+    private final double spacing;
+    private final double cosY;
+    private final double sinY;
+    private final double cosX;
+    private final double sinX;
 
     public Projection3D(
             Grid grid,
@@ -17,37 +21,29 @@ public class Projection3D {
             int panelWidth,
             int panelHeight
     ) {
-        this.grid = grid;
-        this.visualScale = visualScale;
-        this.angleX = angleX;
-        this.angleY = angleY;
         this.panelWidth = panelWidth;
         this.panelHeight = panelHeight;
+        this.centerX = (grid.width - 1) / 2.0;
+        this.centerY = (grid.height - 1) / 2.0;
+        this.centerZ = (grid.depth - 1) / 2.0;
+        this.spacing = 62 * visualScale;
+        this.cosY = Math.cos(angleY);
+        this.sinY = Math.sin(angleY);
+        this.cosX = Math.cos(angleX);
+        this.sinX = Math.sin(angleX);
     }
 
     public ProjectedPoint project(double x, double y, double z) {
-        double centerX = (grid.width - 1) / 2.0;
-        double centerY = (grid.height - 1) / 2.0;
-        double centerZ = (grid.depth - 1) / 2.0;
-
         x -= centerX;
         y -= centerY;
         z -= centerZ;
-
-        double spacing = 62 * visualScale;
 
         x *= spacing;
         y *= spacing;
         z *= spacing;
 
-        double cosY = Math.cos(angleY);
-        double sinY = Math.sin(angleY);
-
         double rotatedX = x * cosY + z * sinY;
         double rotatedZ = -x * sinY + z * cosY;
-
-        double cosX = Math.cos(angleX);
-        double sinX = Math.sin(angleX);
 
         double rotatedY = y * cosX - rotatedZ * sinX;
         rotatedZ = y * sinX + rotatedZ * cosX;

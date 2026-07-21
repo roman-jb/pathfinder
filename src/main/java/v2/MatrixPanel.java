@@ -4,8 +4,6 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.util.Comparator;
-import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
@@ -152,15 +150,11 @@ public class MatrixPanel extends JPanel {
                 getHeight()
         );
 
-        List<Point3D> candidates = data.interactiveFrontier.stream()
-                .sorted(Comparator.comparingDouble(p -> projection.project(p.x, p.y, p.z).depth))
-                .toList();
-
         Point3D bestPoint = null;
         double bestDepth = Double.POSITIVE_INFINITY;
         double bestDistance = Double.POSITIVE_INFINITY;
 
-        for (Point3D p : candidates) {
+        for (Point3D p : data.interactiveFrontier) {
             ProjectedPoint projected = projection.project(p.x, p.y, p.z);
             int size = Math.max(3, (int) (12 * projected.scale * visualScale));
             double radius = size / 2.0;

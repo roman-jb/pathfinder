@@ -1,8 +1,6 @@
 package v2;
 
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -12,7 +10,7 @@ public class Renderer2D {
 
     public void draw(Graphics2D g2, RenderData data, double scale) {
         Grid grid = data.grid;
-        Set<Point3D> pathSet = new HashSet<>(data.path);
+        Set<Point3D> pathSet = data.pathSet;
 
         int cellSize = Math.max(8, (int) (BASE_CELL_SIZE * scale));
 
@@ -174,7 +172,7 @@ public class Renderer2D {
             int startX,
             int startY
     ) {
-        List<Point3D> path = new ArrayList<>(data.path);
+        List<Point3D> path = data.path;
 
         if (path.size() >= 2) {
             g2.setColor(new Color(75, 145, 235));
