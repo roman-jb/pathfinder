@@ -1,7 +1,6 @@
 package v2;
 
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -35,10 +34,10 @@ public class RenderData {
         this.path = path;
         this.pathSet = path == null
                 ? Collections.emptySet()
-                : Collections.unmodifiableSet(new HashSet<>(path));
+                : Set.copyOf(path);
         this.interactiveFrontier = interactiveFrontier == null
                 ? Collections.emptySet()
-                : Collections.unmodifiableSet(new HashSet<>(interactiveFrontier));
+                : Set.copyOf(interactiveFrontier);
         this.interactiveSelected = interactiveSelected;
         this.interactiveComplete = interactiveComplete;
         this.hideUnusedNodes = hideUnusedNodes;

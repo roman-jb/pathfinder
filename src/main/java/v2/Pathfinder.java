@@ -4,14 +4,7 @@ import java.util.*;
 
 public class Pathfinder {
 
-    private static class Node {
-        Point3D point;
-        int cost;
-
-        Node(Point3D point, int cost) {
-            this.point = point;
-            this.cost = cost;
-        }
+    private record Node(Point3D point, int cost) {
     }
 
     public static List<Point3D> findPath(
@@ -33,7 +26,7 @@ public class Pathfinder {
                 Comparator.comparingInt(n -> n.cost)
         );
 
-        dist[start.z][start.y][start.x] = 0;
+        dist[start.z()][start.y()][start.x()] = 0;
         queue.add(new Node(start, 0));
 
         int[][] directions = grid.depth == 1
@@ -58,12 +51,12 @@ public class Pathfinder {
 
             if (p.equals(end)) break;
 
-            if (current.cost > dist[p.z][p.y][p.x]) continue;
+            if (current.cost > dist[p.z()][p.y()][p.x()]) continue;
 
             for (int[] d : directions) {
-                int nx = p.x + d[0];
-                int ny = p.y + d[1];
-                int nz = p.z + d[2];
+                int nx = p.x() + d[0];
+                int ny = p.y() + d[1];
+                int nz = p.z() + d[2];
 
                 if (!grid.isInside(nx, ny, nz)) continue;
 
@@ -73,7 +66,7 @@ public class Pathfinder {
                         ? grid.getWeight(next)
                         : 1;
 
-                int newCost = dist[p.z][p.y][p.x] + stepCost;
+                int newCost = dist[p.z()][p.y()][p.x()] + stepCost;
 
                 if (newCost < dist[nz][ny][nx]) {
                     dist[nz][ny][nx] = newCost;
@@ -100,12 +93,12 @@ public class Pathfinder {
 
             if (current.equals(start)) break;
 
-            current = previous[current.z][current.y][current.x];
+            current = previous[current.z()][current.y()][current.x()];
         }
 
         Collections.reverse(path);
 
-        if (path.isEmpty() || !path.get(0).equals(start)) {
+        if (path.isEmpty() || !path.getFirst().equals(start)) {
             return Collections.emptyList();
         }
 

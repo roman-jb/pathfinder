@@ -126,8 +126,8 @@ public class MatrixPanel extends JPanel {
         int startY = 40;
 
         for (Point3D p : data.interactiveFrontier) {
-            int drawX = startX + p.x * cellSize;
-            int drawY = startY + p.y * cellSize;
+            int drawX = startX + p.x() * cellSize;
+            int drawY = startY + p.y() * cellSize;
 
             if (mouseX >= drawX
                     && mouseX <= drawX + cellSize
@@ -155,17 +155,17 @@ public class MatrixPanel extends JPanel {
         double bestDistance = Double.POSITIVE_INFINITY;
 
         for (Point3D p : data.interactiveFrontier) {
-            ProjectedPoint projected = projection.project(p.x, p.y, p.z);
-            int size = Math.max(3, (int) (12 * projected.scale * visualScale));
+            ProjectedPoint projected = projection.project(p.x(), p.y(), p.z());
+            int size = Math.max(3, (int) (12 * projected.scale() * visualScale));
             double radius = size / 2.0;
-            double dx = mouseX - projected.screenX;
-            double dy = mouseY - projected.screenY;
+            double dx = mouseX - projected.screenX();
+            double dy = mouseY - projected.screenY();
             double distance = Math.hypot(dx, dy);
 
             if (distance <= radius + 2) {
-                if (projected.depth < bestDepth
-                        || (projected.depth == bestDepth && distance < bestDistance)) {
-                    bestDepth = projected.depth;
+                if (projected.depth() < bestDepth
+                        || (projected.depth() == bestDepth && distance < bestDistance)) {
+                    bestDepth = projected.depth();
                     bestDistance = distance;
                     bestPoint = p;
                 }

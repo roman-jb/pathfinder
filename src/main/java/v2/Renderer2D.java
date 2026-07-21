@@ -180,10 +180,10 @@ public class Renderer2D {
                 Point3D a = path.get(i - 1);
                 Point3D b = path.get(i);
                 g2.drawLine(
-                        startX + a.x * cellSize + cellSize / 2,
-                        startY + a.y * cellSize + cellSize / 2,
-                        startX + b.x * cellSize + cellSize / 2,
-                        startY + b.y * cellSize + cellSize / 2
+                        startX + a.x() * cellSize + cellSize / 2,
+                        startY + a.y() * cellSize + cellSize / 2,
+                        startX + b.x() * cellSize + cellSize / 2,
+                        startY + b.y() * cellSize + cellSize / 2
                 );
             }
         }
@@ -194,10 +194,10 @@ public class Renderer2D {
 
             g2.setColor(new Color(70, 190, 90));
             g2.drawLine(
-                    startX + lastConfirmed.x * cellSize + cellSize / 2,
-                    startY + lastConfirmed.y * cellSize + cellSize / 2,
-                    startX + selected.x * cellSize + cellSize / 2,
-                    startY + selected.y * cellSize + cellSize / 2
+                    startX + lastConfirmed.x() * cellSize + cellSize / 2,
+                    startY + lastConfirmed.y() * cellSize + cellSize / 2,
+                    startX + selected.x() * cellSize + cellSize / 2,
+                    startY + selected.y() * cellSize + cellSize / 2
             );
         }
     }

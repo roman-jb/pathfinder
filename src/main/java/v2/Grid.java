@@ -29,7 +29,7 @@ public class Grid {
     }
 
     public int getWeight(Point3D p) {
-        return weights[p.z][p.y][p.x];
+        return weights[p.z()][p.y()][p.x()];
     }
 
     public int calculatePathCost(List<Point3D> path) {

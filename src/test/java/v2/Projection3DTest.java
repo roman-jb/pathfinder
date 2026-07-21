@@ -13,10 +13,10 @@ class Projection3DTest {
 
         ProjectedPoint projected = projection.project(0, 0, 0);
 
-        assertEquals(400, projected.screenX);
-        assertEquals(300, projected.screenY);
-        assertEquals(0.0, projected.depth, 1e-9);
-        assertEquals(1.0, projected.scale, 1e-9);
+        assertEquals(400, projected.screenX());
+        assertEquals(300, projected.screenY());
+        assertEquals(0.0, projected.depth(), 1e-9);
+        assertEquals(1.0, projected.scale(), 1e-9);
     }
 
     @Test
@@ -26,9 +26,9 @@ class Projection3DTest {
 
         ProjectedPoint projected = projection.project(2, 1, 1);
 
-        assertEquals(462, projected.screenX);
-        assertEquals(300, projected.screenY);
-        assertEquals(0.0, projected.depth, 1e-9);
+        assertEquals(462, projected.screenX());
+        assertEquals(300, projected.screenY());
+        assertEquals(0.0, projected.depth(), 1e-9);
     }
 
     @Test
@@ -38,10 +38,10 @@ class Projection3DTest {
 
         ProjectedPoint projected = projection.project(2, 1, 1);
 
-        assertEquals(400, projected.screenX);
-        assertEquals(300, projected.screenY);
-        assertEquals(-62.0, projected.depth, 1e-9);
-        assertEquals(850.0 / 788.0, projected.scale, 1e-9);
+        assertEquals(400, projected.screenX());
+        assertEquals(300, projected.screenY());
+        assertEquals(-62.0, projected.depth(), 1e-9);
+        assertEquals(850.0 / 788.0, projected.scale(), 1e-9);
     }
 
     @Test
@@ -51,8 +51,8 @@ class Projection3DTest {
 
         ProjectedPoint projected = projection.project(0, 0, 0);
 
-        assertEquals(400, projected.screenX);
-        assertEquals(300, projected.screenY);
-        assertEquals(1.0, projected.scale, 1e-9);
+        assertEquals(400, projected.screenX());
+        assertEquals(300, projected.screenY());
+        assertEquals(1.0, projected.scale(), 1e-9);
     }
 }

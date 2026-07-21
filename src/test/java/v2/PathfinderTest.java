@@ -68,7 +68,7 @@ class PathfinderTest {
         for (int i = 1; i < path.size(); i++) {
             Point3D a = path.get(i - 1);
             Point3D b = path.get(i);
-            int manhattan = Math.abs(a.x - b.x) + Math.abs(a.y - b.y) + Math.abs(a.z - b.z);
+            int manhattan = Math.abs(a.x() - b.x()) + Math.abs(a.y() - b.y()) + Math.abs(a.z() - b.z());
             assertEquals(1, manhattan);
         }
     }

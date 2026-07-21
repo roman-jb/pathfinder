@@ -1,26 +1,11 @@
 package v2;
 
-import java.util.Objects;
-
-public class Point3D {
-    public final int x;
-    public final int y;
-    public final int z;
-
-    public Point3D(int x, int y, int z) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
-    }
+public record Point3D(int x, int y, int z) {
 
     @Override
     public boolean equals(Object obj) {
-        if (!(obj instanceof Point3D other)) return false;
-        return x == other.x && y == other.y && z == other.z;
+        if (!(obj instanceof Point3D(int x1, int y1, int z1))) return false;
+        return x == x1 && y == y1 && z == z1;
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(x, y, z);
-    }
 }

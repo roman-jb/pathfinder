@@ -85,7 +85,7 @@ public class Renderer3D {
                         } else {
                             spheres.add(new Sphere(
                                     p,
-                                    projection.project(p.x, p.y, p.z),
+                                    projection.project(p.x(), p.y(), p.z()),
                                     UNUSED_NODE_COLOR,
                                     null,
                                     0.5
@@ -96,9 +96,9 @@ public class Renderer3D {
             }
         }
 
-        spheres.sort(Comparator.comparingDouble(s -> s.projected.depth));
-        unusedCubes.sort(Comparator.comparingDouble(c -> c.depth));
-        pathCubes.sort(Comparator.comparingDouble(c -> c.depth));
+        spheres.sort(Comparator.comparingDouble(s -> s.projected().depth()));
+        unusedCubes.sort(Comparator.comparingDouble(Cube::depth));
+        pathCubes.sort(Comparator.comparingDouble(Cube::depth));
 
         for (Sphere sphere : spheres) {
             drawSphere(g2, sphere, scale);
@@ -153,7 +153,7 @@ public class Renderer3D {
                         } else if (RenderUtils.isInteractiveSphere(data, p)) {
                             spheres.add(new Sphere(
                                     p,
-                                    projection.project(p.x, p.y, p.z),
+                                    projection.project(p.x(), p.y(), p.z()),
                                     RenderUtils.getCellColor(data, p, pathSet),
                                     RenderUtils.getCellText(data, p),
                                     RenderUtils.getInteractiveSizeFactor(data, p)
@@ -164,8 +164,8 @@ public class Renderer3D {
             }
         }
 
-        spheres.sort(Comparator.comparingDouble(s -> s.projected.depth));
-        pathCubes.sort(Comparator.comparingDouble(c -> c.depth));
+        spheres.sort(Comparator.comparingDouble(s -> s.projected().depth()));
+        pathCubes.sort(Comparator.comparingDouble(Cube::depth));
 
         for (Sphere sphere : spheres) {
             drawSphere(g2, sphere, scale);
@@ -198,28 +198,28 @@ public class Renderer3D {
     }
 
     private void drawSphere(Graphics2D g2, Sphere sphere, double scale) {
-        ProjectedPoint projected = sphere.projected;
+        ProjectedPoint projected = sphere.projected();
 
-        int baseSize = Math.max(3, (int) (12 * projected.scale * scale * sphere.sizeFactor));
+        int baseSize = Math.max(3, (int) (12 * projected.scale() * scale * sphere.sizeFactor()));
         int size = baseSize;
         Font font;
         FontMetrics fm = null;
 
-        if (sphere.label != null && !sphere.label.isBlank()) {
-            font = new Font("Arial", Font.BOLD, Math.max(8, (int) (14 * projected.scale * scale)));
+        if (sphere.label() != null && !sphere.label().isBlank()) {
+            font = new Font("Arial", Font.BOLD, Math.max(8, (int) (14 * projected.scale() * scale)));
             g2.setFont(font);
             fm = g2.getFontMetrics();
-            int labelWidth = fm.stringWidth(sphere.label);
+            int labelWidth = fm.stringWidth(sphere.label());
             int labelHeight = fm.getHeight();
             size = Math.max(baseSize, Math.max(labelWidth, labelHeight) + 12);
         }
 
-        int x = projected.screenX - size / 2;
-        int y = projected.screenY - size / 2;
+        int x = projected.screenX() - size / 2;
+        int y = projected.screenY() - size / 2;
 
-        Color fill = sphere.color != null ? sphere.color : new Color(155, 155, 155, 135);
-        Color outline = sphere.color != null
-                ? RenderUtils.darken(sphere.color, 0.72)
+        Color fill = sphere.color() != null ? sphere.color() : new Color(155, 155, 155, 135);
+        Color outline = sphere.color() != null
+                ? RenderUtils.darken(sphere.color(), 0.72)
                 : UNUSED_NODE_OUTLINE;
 
         g2.setColor(fill);
@@ -232,20 +232,20 @@ public class Renderer3D {
         g2.setColor(SPHERE_HIGHLIGHT);
         g2.fillOval(x + size / 5, y + size / 5, highlightSize, highlightSize);
 
-        if (sphere.label != null && !sphere.label.isBlank() && fm != null) {
+        if (sphere.label() != null && !sphere.label().isBlank() && fm != null) {
             g2.setColor(Color.BLACK);
-            int textX = projected.screenX - fm.stringWidth(sphere.label) / 2;
-            int textY = projected.screenY + fm.getAscent() / 2;
-            g2.drawString(sphere.label, textX, textY);
+            int textX = projected.screenX() - fm.stringWidth(sphere.label()) / 2;
+            int textY = projected.screenY() + fm.getAscent() / 2;
+            g2.drawString(sphere.label(), textX, textY);
         }
     }
 
     private Cube createCube(Point3D p, Projection3D projection, double sizeFactor) {
         double size = Math.max(0.05, (12.0 / 62.0) * sizeFactor);
         double half = size / 2.0;
-        double x = p.x;
-        double y = p.y;
-        double z = p.z;
+        double x = p.x();
+        double y = p.y();
+        double z = p.z();
 
         ProjectedPoint[] projected = new ProjectedPoint[8];
         double avgDepth = 0;
@@ -260,7 +260,7 @@ public class Renderer3D {
         projected[7] = projection.project(x - half, y + half, z + half);
 
         for (ProjectedPoint point : projected) {
-            avgDepth += point.depth;
+            avgDepth += point.depth();
         }
 
         avgDepth /= 8.0;
@@ -276,8 +276,8 @@ public class Renderer3D {
             double scale,
             Projection3D projection
     ) {
-        Color base = RenderUtils.getCellColor(data, cube.point, pathSet);
-        String label = RenderUtils.getCellText(data, cube.point);
+        Color base = RenderUtils.getCellColor(data, cube.point(), pathSet);
+        String label = RenderUtils.getCellText(data, cube.point());
         drawCube(g2, cube, base, label, scale, projection);
     }
 
@@ -297,7 +297,7 @@ public class Renderer3D {
         drawFace(g2, cube, CUBE_FACES[4], base);
         drawFace(g2, cube, CUBE_FACES[5], RenderUtils.darken(base, 0.88));
 
-        drawCubeEdges(g2, cube, scale * cube.sizeFactor);
+        drawCubeEdges(g2, cube, scale * cube.sizeFactor());
 
         if (scale >= 0.45 && label != null && !label.isBlank()) {
             draw3DLabel(g2, cube, label, scale, projection);
@@ -309,8 +309,8 @@ public class Renderer3D {
 
         for (int index : indexes) {
             polygon.addPoint(
-                    cube.points[index].screenX,
-                    cube.points[index].screenY
+                    cube.points()[index].screenX(),
+                    cube.points()[index].screenY()
             );
         }
 
@@ -326,9 +326,9 @@ public class Renderer3D {
         g2.setColor(EDGE_COLOR);
 
         for (int[] edge : CUBE_EDGES) {
-            ProjectedPoint a = cube.points[edge[0]];
-            ProjectedPoint b = cube.points[edge[1]];
-            g2.drawLine(a.screenX, a.screenY, b.screenX, b.screenY);
+            ProjectedPoint a = cube.points()[edge[0]];
+            ProjectedPoint b = cube.points()[edge[1]];
+            g2.drawLine(a.screenX(), a.screenY(), b.screenX(), b.screenY());
         }
     }
 
@@ -340,16 +340,16 @@ public class Renderer3D {
             Projection3D projection
     ) {
         ProjectedPoint center = projection.project(
-                cube.point.x,
-                cube.point.y,
-                cube.point.z
+                cube.point().x(),
+                cube.point().y(),
+                cube.point().z()
         );
 
         g2.setFont(new Font("Arial", Font.BOLD, Math.max(8, (int) (16 * scale))));
         FontMetrics fm = g2.getFontMetrics();
 
-        int x = center.screenX - fm.stringWidth(text) / 2;
-        int y = center.screenY + fm.getAscent() / 2;
+        int x = center.screenX() - fm.stringWidth(text) / 2;
+        int y = center.screenY() + fm.getAscent() / 2;
 
         g2.setColor(Color.BLACK);
         g2.drawString(text, x, y);
@@ -370,10 +370,10 @@ public class Renderer3D {
                 Point3D aPoint = path.get(i - 1);
                 Point3D bPoint = path.get(i);
 
-                ProjectedPoint a = projection.project(aPoint.x, aPoint.y, aPoint.z);
-                ProjectedPoint b = projection.project(bPoint.x, bPoint.y, bPoint.z);
+                ProjectedPoint a = projection.project(aPoint.x(), aPoint.y(), aPoint.z());
+                ProjectedPoint b = projection.project(bPoint.x(), bPoint.y(), bPoint.z());
 
-                g2.drawLine(a.screenX, a.screenY, b.screenX, b.screenY);
+                g2.drawLine(a.screenX(), a.screenY(), b.screenX(), b.screenY());
             }
         }
 
@@ -388,9 +388,9 @@ public class Renderer3D {
             ));
             g2.setColor(INTERACTIVE_LINK_COLOR);
 
-            ProjectedPoint a = projection.project(lastConfirmed.x, lastConfirmed.y, lastConfirmed.z);
-            ProjectedPoint b = projection.project(selected.x, selected.y, selected.z);
-            g2.drawLine(a.screenX, a.screenY, b.screenX, b.screenY);
+            ProjectedPoint a = projection.project(lastConfirmed.x(), lastConfirmed.y(), lastConfirmed.z());
+            ProjectedPoint b = projection.project(selected.x(), selected.y(), selected.z());
+            g2.drawLine(a.screenX(), a.screenY(), b.screenX(), b.screenY());
         }
 
         g2.setStroke(new BasicStroke(1f));
@@ -416,10 +416,10 @@ public class Renderer3D {
             Point3D aPoint = path.get(i - 1);
             Point3D bPoint = path.get(i);
 
-            ProjectedPoint a = projection.project(aPoint.x, aPoint.y, aPoint.z);
-            ProjectedPoint b = projection.project(bPoint.x, bPoint.y, bPoint.z);
+            ProjectedPoint a = projection.project(aPoint.x(), aPoint.y(), aPoint.z());
+            ProjectedPoint b = projection.project(bPoint.x(), bPoint.y(), bPoint.z());
 
-            g2.drawLine(a.screenX, a.screenY, b.screenX, b.screenY);
+            g2.drawLine(a.screenX(), a.screenY(), b.screenX(), b.screenY());
         }
 
         g2.setStroke(new BasicStroke(1f));

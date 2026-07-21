@@ -273,9 +273,9 @@ public class MainFrame extends JFrame {
         };
 
         for (int[] direction : directions) {
-            int nx = point.x + direction[0];
-            int ny = point.y + direction[1];
-            int nz = point.z + direction[2];
+            int nx = point.x() + direction[0];
+            int ny = point.y() + direction[1];
+            int nz = point.z() + direction[2];
 
             if (currentGrid.isInside(nx, ny, nz)) {
                 neighbors.add(new Point3D(nx, ny, nz));

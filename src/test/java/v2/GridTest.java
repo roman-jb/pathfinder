@@ -26,7 +26,7 @@ class GridTest {
         for (int i = 0; i < 200; i++) {
             Point3D point = grid.randomPoint();
 
-            assertTrue(grid.isInside(point.x, point.y, point.z));
+            assertTrue(grid.isInside(point.x(), point.y(), point.z()));
         }
     }
 

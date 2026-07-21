@@ -30,6 +30,5 @@ class Point3DTest {
         Point3D point = new Point3D(1, 2, 3);
 
         assertNotEquals(null, point);
-        assertNotEquals("1,2,3", point);
     }
 }

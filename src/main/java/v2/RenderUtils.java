@@ -42,7 +42,7 @@ public class RenderUtils {
             return new Color(75, 145, 235);
         }
 
-        int weight = data.grid.weights[p.z][p.y][p.x];
+        int weight = data.grid.weights[p.z()][p.y()][p.x()];
         int shade = 245 - weight * 14;
 
         return new Color(shade, shade, shade);
@@ -55,7 +55,7 @@ public class RenderUtils {
             if (p.equals(data.interactiveSelected)) return ">";
             if (pathContains(data, p)) return "";
             if (data.interactiveFrontier.contains(p)) {
-                return String.valueOf(data.grid.weights[p.z][p.y][p.x]);
+                return String.valueOf(data.grid.weights[p.z()][p.y()][p.x()]);
             }
             return "";
         }
@@ -63,7 +63,7 @@ public class RenderUtils {
         if (p.equals(data.start)) return "S";
         if (p.equals(data.end)) return "E";
 
-        return String.valueOf(data.grid.weights[p.z][p.y][p.x]);
+        return String.valueOf(data.grid.weights[p.z()][p.y()][p.x()]);
     }
 
     public static boolean isInteractiveVisible(RenderData data, Point3D p) {
@@ -71,12 +71,12 @@ public class RenderUtils {
     }
 
     public static boolean isSurfaceNode(Grid grid, Point3D p) {
-        return p.x == 0
-                || p.y == 0
-                || p.z == 0
-                || p.x == grid.width - 1
-                || p.y == grid.height - 1
-                || p.z == grid.depth - 1;
+        return p.x() == 0
+                || p.y() == 0
+                || p.z() == 0
+                || p.x() == grid.width - 1
+                || p.y() == grid.height - 1
+                || p.z() == grid.depth - 1;
     }
 
     public static boolean isInteractiveBox(RenderData data, Point3D p) {
