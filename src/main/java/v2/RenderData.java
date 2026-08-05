@@ -15,6 +15,8 @@ public class RenderData {
     public final Point3D interactiveSelected;
     public final boolean interactiveComplete;
     public final boolean hideUnusedNodes;
+    public final Point3D previewPoint;
+    public final boolean previewVisible;
 
     public RenderData(
             Grid grid,
@@ -26,6 +28,34 @@ public class RenderData {
             Point3D interactiveSelected,
             boolean interactiveComplete,
             boolean hideUnusedNodes
+    ) {
+        this(
+                grid,
+                pathType,
+                start,
+                end,
+                path,
+                interactiveFrontier,
+                interactiveSelected,
+                interactiveComplete,
+                hideUnusedNodes,
+                null,
+                false
+        );
+    }
+
+    public RenderData(
+            Grid grid,
+            PathType pathType,
+            Point3D start,
+            Point3D end,
+            List<Point3D> path,
+            Set<Point3D> interactiveFrontier,
+            Point3D interactiveSelected,
+            boolean interactiveComplete,
+            boolean hideUnusedNodes,
+            Point3D previewPoint,
+            boolean previewVisible
     ) {
         this.grid = grid;
         this.pathType = pathType;
@@ -41,5 +71,7 @@ public class RenderData {
         this.interactiveSelected = interactiveSelected;
         this.interactiveComplete = interactiveComplete;
         this.hideUnusedNodes = hideUnusedNodes;
+        this.previewPoint = previewPoint;
+        this.previewVisible = previewVisible;
     }
 }

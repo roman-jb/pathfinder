@@ -3,8 +3,11 @@ package v2;
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class MainFrame extends JFrame {
@@ -12,6 +15,7 @@ public class MainFrame extends JFrame {
     private final JCheckBox mode3DCheckBox = new JCheckBox("3D mode");
     private final JCheckBox hideUnusedNodesCheckBox = new JCheckBox("Hide unused nodes");
     private final JCheckBox demoModeCheckBox = new JCheckBox("DEMO MODE");
+    private final JCheckBox thirdPersonDemoCheckBox = new JCheckBox("DEMO MODE - 3rd person camera");
     private final JComboBox<PathType> pathTypeBox = new JComboBox<>(PathType.values());
 
     private final JTextField widthField = new JTextField("8", 4);
@@ -22,12 +26,19 @@ public class MainFrame extends JFrame {
 
     private final JSlider scaleSlider = new JSlider(30, 150, 100);
 
+    private final JButton generateButton = new JButton("Generate Matrix");
     private final JButton rerollPointsButton = new JButton("New Start / End");
 
     private final JLabel pathLengthLabel = new JLabel("Length: -");
     private final JLabel pathCostLabel = new JLabel("Cost: -");
 
     private final MatrixPanel matrixPanel = new MatrixPanel();
+    private final JPanel mainControlsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    private final Map<UiElement, JPanel> uiElementPanels = new EnumMap<>(UiElement.class);
+    private final Map<UiElement, Boolean> uiElementVisibility = new EnumMap<>(UiElement.class);
+
+    private JDialog optionsDialog;
+    private JPanel optionsControlsPanel;
 
     private Grid currentGrid;
     private Point3D currentStart;
@@ -37,51 +48,30 @@ public class MainFrame extends JFrame {
     private boolean interactiveComplete;
 
     private Timer demoTimer;
+    private Timer demoBlinkTimer;
     private List<Point3D> demoPath = List.of();
     private int demoVisibleNodes;
+    private boolean demoPreviewVisible;
 
     public MainFrame() {
         super("Pathfinding 2D / 3D");
 
-        JButton generateButton = new JButton("Generate Matrix");
+        registerUiElements();
 
-        JPanel controls = new JPanel();
+        JPanel topBar = new JPanel(new BorderLayout());
+        topBar.add(mainControlsPanel, BorderLayout.CENTER);
 
-        controls.add(mode3DCheckBox);
-        controls.add(hideUnusedNodesCheckBox);
-        controls.add(demoModeCheckBox);
+        JPanel optionsButtonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton optionsButton = new JButton("OPTIONS");
+        optionsButtonPanel.add(optionsButton);
+        topBar.add(optionsButtonPanel, BorderLayout.EAST);
 
-        controls.add(new JLabel("Path type:"));
-        controls.add(pathTypeBox);
-
-        controls.add(new JLabel("Width X:"));
-        controls.add(widthField);
-
-        controls.add(new JLabel("Height Y:"));
-        controls.add(heightField);
-
-        controls.add(new JLabel("Depth Z:"));
-        controls.add(depthField);
-
-        controls.add(new JLabel("Scale:"));
-        controls.add(scaleSlider);
-
-        controls.add(new JLabel("Step delay (ms):"));
-        controls.add(stepDelayField);
-
-        controls.add(new JLabel("Cycle delay (ms):"));
-        controls.add(cycleDelayField);
-
-        controls.add(generateButton);
-        controls.add(rerollPointsButton);
-
-        controls.add(pathLengthLabel);
-        controls.add(pathCostLabel);
+        rebuildControlLocations();
 
         depthField.setEnabled(false);
         rerollPointsButton.setEnabled(false);
 
-        add(controls, BorderLayout.NORTH);
+        add(topBar, BorderLayout.NORTH);
         add(matrixPanel, BorderLayout.CENTER);
 
         matrixPanel.setClickHandler(this::handleNodeClick);
@@ -94,20 +84,28 @@ public class MainFrame extends JFrame {
 
         generateButton.addActionListener(e -> generateMatrix());
         rerollPointsButton.addActionListener(e -> rerollStartEnd());
+        optionsButton.addActionListener(e -> showOptionsWindow());
 
         demoModeCheckBox.addActionListener(e -> {
             if (demoModeCheckBox.isSelected()) {
-                if (currentGrid == null) {
-                    if (!generateMatrix()) {
-                        demoModeCheckBox.setSelected(false);
-                    }
-                } else {
-                    startDemoCycle();
+                if (currentGrid != null && currentStart != null && currentEnd != null) {
+                    beginPathAnimation();
                 }
             } else {
                 stopDemo();
                 syncPathStateToSelection();
                 refreshDisplay();
+            }
+        });
+
+        thirdPersonDemoCheckBox.addActionListener(e -> {
+            if (demoModeCheckBox.isSelected()
+                    && currentGrid != null
+                    && currentStart != null
+                    && currentEnd != null) {
+                int stepDelay = readDelay(stepDelayField, 250);
+                prepareDemoCamera(false, stepDelay);
+                renderDemoProgress();
             }
         });
 
@@ -118,7 +116,11 @@ public class MainFrame extends JFrame {
         pathTypeBox.addActionListener(e -> {
             if (currentGrid != null) {
                 if (demoModeCheckBox.isSelected()) {
-                    startDemoCycle();
+                    if (currentStart != null && currentEnd != null) {
+                        beginPathAnimation();
+                    } else {
+                        renderMatrixWithoutPoints();
+                    }
                 } else {
                     syncPathStateToSelection();
                     refreshDisplay();
@@ -128,7 +130,9 @@ public class MainFrame extends JFrame {
 
         hideUnusedNodesCheckBox.addActionListener(e -> {
             if (currentGrid != null) {
-                if (demoModeCheckBox.isSelected()) {
+                if (currentStart == null || currentEnd == null) {
+                    renderMatrixWithoutPoints();
+                } else if (demoModeCheckBox.isSelected()) {
                     renderDemoProgress();
                 } else {
                     refreshDisplay();
@@ -144,6 +148,199 @@ public class MainFrame extends JFrame {
         setSize(1600, 900);
         setLocationRelativeTo(null);
         setVisible(true);
+    }
+
+    private void registerUiElements() {
+        registerUiElement(UiElement.MODE_3D, controlPanel(mode3DCheckBox));
+        registerUiElement(UiElement.HIDE_UNUSED_NODES, controlPanel(hideUnusedNodesCheckBox));
+        registerUiElement(UiElement.DEMO_MODE, controlPanel(demoModeCheckBox));
+        registerUiElement(
+                UiElement.THIRD_PERSON_DEMO_CAMERA,
+                controlPanel(thirdPersonDemoCheckBox),
+                false
+        );
+        registerUiElement(UiElement.PATH_TYPE, labeledControl("Path type:", pathTypeBox));
+        registerUiElement(UiElement.WIDTH, labeledControl("Width X:", widthField));
+        registerUiElement(UiElement.HEIGHT, labeledControl("Height Y:", heightField));
+        registerUiElement(UiElement.DEPTH, labeledControl("Depth Z:", depthField));
+        registerUiElement(UiElement.SCALE, labeledControl("Scale:", scaleSlider));
+        registerUiElement(
+                UiElement.STEP_DELAY,
+                labeledControl("Step delay (ms):", stepDelayField),
+                false
+        );
+        registerUiElement(
+                UiElement.CYCLE_DELAY,
+                labeledControl("Cycle delay (ms):", cycleDelayField),
+                false
+        );
+        registerUiElement(UiElement.GENERATE_MATRIX, controlPanel(generateButton));
+        registerUiElement(UiElement.NEW_START_END, controlPanel(rerollPointsButton));
+        registerUiElement(UiElement.PATH_LENGTH, controlPanel(pathLengthLabel));
+        registerUiElement(UiElement.PATH_COST, controlPanel(pathCostLabel));
+    }
+
+    private void registerUiElement(UiElement element, JPanel panel) {
+        registerUiElement(element, panel, true);
+    }
+
+    private void registerUiElement(UiElement element, JPanel panel, boolean visibleInMainWindow) {
+        uiElementPanels.put(element, panel);
+        uiElementVisibility.put(element, visibleInMainWindow);
+    }
+
+    private JPanel labeledControl(String label, JComponent component) {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        panel.add(new JLabel(label));
+        panel.add(component);
+        return panel;
+    }
+
+    private JPanel controlPanel(JComponent component) {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        panel.add(component);
+        return panel;
+    }
+
+    private void showOptionsWindow() {
+        if (optionsDialog == null) {
+            createOptionsWindow();
+        }
+
+        rebuildControlLocations();
+        optionsDialog.setLocationRelativeTo(this);
+        optionsDialog.setVisible(true);
+        optionsDialog.toFront();
+    }
+
+    private void createOptionsWindow() {
+        optionsDialog = new JDialog(this, "OPTIONS", false);
+        optionsDialog.setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
+        optionsDialog.setLayout(new BorderLayout(8, 8));
+
+        optionsControlsPanel = new JPanel();
+        optionsControlsPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        optionsControlsPanel.setLayout(new BoxLayout(optionsControlsPanel, BoxLayout.Y_AXIS));
+        optionsDialog.add(new JScrollPane(optionsControlsPanel), BorderLayout.CENTER);
+
+        JButton editUiButton = new JButton("Edit UI");
+        editUiButton.addActionListener(e -> showEditUiWindow());
+
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel.setBorder(BorderFactory.createEmptyBorder(4, 8, 8, 8));
+        bottomPanel.add(editUiButton, BorderLayout.WEST);
+        optionsDialog.add(bottomPanel, BorderLayout.SOUTH);
+
+        optionsDialog.setSize(900, 300);
+    }
+
+    private void showEditUiWindow() {
+        JDialog editDialog = new JDialog(optionsDialog, "Edit UI", Dialog.ModalityType.APPLICATION_MODAL);
+        editDialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        editDialog.setLayout(new BorderLayout(8, 8));
+
+        JPanel listPanel = new JPanel();
+        listPanel.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
+        listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
+
+        Map<UiElement, JCheckBox> checkBoxes = new LinkedHashMap<>();
+        for (UiElement element : UiElement.values()) {
+            JCheckBox checkBox = new JCheckBox(element.displayName, uiElementVisibility.get(element));
+            checkBox.setAlignmentX(Component.LEFT_ALIGNMENT);
+            checkBoxes.put(element, checkBox);
+            listPanel.add(checkBox);
+        }
+
+        editDialog.add(new JScrollPane(listPanel), BorderLayout.CENTER);
+
+        JButton cancelButton = new JButton("Cancel");
+        cancelButton.addActionListener(e -> editDialog.dispose());
+
+        JButton okButton = new JButton("OK");
+        okButton.addActionListener(e -> {
+            for (Map.Entry<UiElement, JCheckBox> entry : checkBoxes.entrySet()) {
+                uiElementVisibility.put(entry.getKey(), entry.getValue().isSelected());
+            }
+            rebuildControlLocations();
+            editDialog.dispose();
+        });
+
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel.setBorder(BorderFactory.createEmptyBorder(4, 12, 10, 12));
+        bottomPanel.add(cancelButton, BorderLayout.WEST);
+        bottomPanel.add(okButton, BorderLayout.EAST);
+        editDialog.add(bottomPanel, BorderLayout.SOUTH);
+
+        editDialog.setSize(400, 520);
+        editDialog.setLocationRelativeTo(optionsDialog);
+        editDialog.setVisible(true);
+    }
+
+    private void rebuildControlLocations() {
+        mainControlsPanel.removeAll();
+        if (optionsControlsPanel != null) {
+            optionsControlsPanel.removeAll();
+        }
+
+        int hiddenCount = 0;
+        for (UiElement element : UiElement.values()) {
+            JPanel panel = uiElementPanels.get(element);
+            if (uiElementVisibility.get(element)) {
+                mainControlsPanel.add(panel);
+            } else {
+                hiddenCount++;
+                if (optionsControlsPanel != null) {
+                    if (optionsControlsPanel.getComponentCount() > 0) {
+                        int lineHeight = optionsControlsPanel
+                                .getFontMetrics(optionsControlsPanel.getFont())
+                                .getHeight();
+                        int rowSpacing = Math.max(1, (int) Math.round(lineHeight * 0.30));
+                        optionsControlsPanel.add(Box.createRigidArea(new Dimension(0, rowSpacing)));
+                    }
+                    panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+                    Dimension preferredSize = panel.getPreferredSize();
+                    panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, preferredSize.height));
+                    optionsControlsPanel.add(panel);
+                }
+            }
+        }
+
+        if (optionsControlsPanel != null && hiddenCount == 0) {
+            JLabel emptyLabel = new JLabel("All configurable UI elements are displayed in the main window.");
+            emptyLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            optionsControlsPanel.add(emptyLabel);
+        }
+
+        mainControlsPanel.revalidate();
+        mainControlsPanel.repaint();
+        if (optionsControlsPanel != null) {
+            optionsControlsPanel.revalidate();
+            optionsControlsPanel.repaint();
+        }
+    }
+
+    private enum UiElement {
+        MODE_3D("3D mode"),
+        HIDE_UNUSED_NODES("Hide unused nodes"),
+        DEMO_MODE("DEMO MODE"),
+        THIRD_PERSON_DEMO_CAMERA("DEMO MODE - 3rd person camera"),
+        PATH_TYPE("Path type"),
+        WIDTH("Width X"),
+        HEIGHT("Height Y"),
+        DEPTH("Depth Z"),
+        SCALE("Scale"),
+        STEP_DELAY("Step delay"),
+        CYCLE_DELAY("Cycle delay"),
+        GENERATE_MATRIX("Generate Matrix"),
+        NEW_START_END("New Start / End"),
+        PATH_LENGTH("Path length"),
+        PATH_COST("Path cost");
+
+        private final String displayName;
+
+        UiElement(String displayName) {
+            this.displayName = displayName;
+        }
     }
 
     private boolean generateMatrix() {
@@ -164,13 +361,32 @@ public class MainFrame extends JFrame {
         currentGrid = new Grid(width, height, depth);
         currentGrid.randomizeWeights();
 
+        stopDemo();
+        currentStart = null;
+        currentEnd = null;
+        interactivePath = new ArrayList<>();
+        interactivePending = null;
+        interactiveComplete = false;
+
         rerollPointsButton.setEnabled(true);
-        if (demoModeCheckBox.isSelected()) {
-            startDemoCycle();
-        } else {
-            rerollStartEnd();
-        }
+        pathLengthLabel.setText("Length: -");
+        pathCostLabel.setText("Cost: -");
+        renderMatrixWithoutPoints();
         return true;
+    }
+
+    private void renderMatrixWithoutPoints() {
+        matrixPanel.setData(new RenderData(
+                currentGrid,
+                currentPathType(),
+                null,
+                null,
+                List.of(),
+                Set.of(),
+                null,
+                false,
+                hideUnusedNodesCheckBox.isSelected()
+        ));
     }
 
     private void rerollStartEnd() {
@@ -215,9 +431,11 @@ public class MainFrame extends JFrame {
 
         demoPath = Pathfinder.findPath(currentGrid, currentStart, currentEnd, currentPathType());
         demoVisibleNodes = Math.min(1, demoPath.size());
+        int stepDelay = readDelay(stepDelayField, 250);
+        prepareDemoCamera(false, stepDelay);
         renderDemoProgress();
         if (demoVisibleNodes < demoPath.size()) {
-            scheduleNextDemoStep(readDelay(stepDelayField, 250));
+            scheduleNextDemoStep(stepDelay);
         } else {
             scheduleNextDemoCycle(readDelay(cycleDelayField, 1000));
         }
@@ -237,15 +455,19 @@ public class MainFrame extends JFrame {
         if (demoVisibleNodes < demoPath.size()) {
             Point3D previous = demoPath.get(demoVisibleNodes - 1);
             Point3D next = demoPath.get(demoVisibleNodes);
+            stopDemoBlinking();
             demoVisibleNodes++;
 
-            if (mode3DCheckBox.isSelected() && currentGrid.depth > 1) {
+            int stepDelay = readDelay(stepDelayField, 250);
+            if (isThirdPersonDemoActive()) {
+                prepareDemoCamera(true, stepDelay);
+            } else if (mode3DCheckBox.isSelected() && currentGrid.depth > 1) {
                 matrixPanel.followPath(previous, next);
             }
 
             renderDemoProgress();
             if (demoVisibleNodes < demoPath.size()) {
-                scheduleNextDemoStep(readDelay(stepDelayField, 250));
+                scheduleNextDemoStep(stepDelay);
             } else {
                 scheduleNextDemoCycle(readDelay(cycleDelayField, 1000));
             }
@@ -260,6 +482,9 @@ public class MainFrame extends JFrame {
 
     private void renderDemoProgress() {
         List<Point3D> visiblePath = new ArrayList<>(demoPath.subList(0, demoVisibleNodes));
+        Point3D previewPoint = isThirdPersonDemoActive() && demoVisibleNodes < demoPath.size()
+                ? demoPath.get(demoVisibleNodes)
+                : null;
 
         pathLengthLabel.setText("Length: " + Math.max(0, visiblePath.size() - 1));
         pathCostLabel.setText("Cost: " + currentGrid.calculatePathCost(visiblePath));
@@ -273,15 +498,67 @@ public class MainFrame extends JFrame {
                 Set.of(),
                 null,
                 demoVisibleNodes == demoPath.size(),
-                hideUnusedNodesCheckBox.isSelected()
+                hideUnusedNodesCheckBox.isSelected(),
+                previewPoint,
+                previewPoint != null && demoPreviewVisible
         ));
+    }
+
+    private void prepareDemoCamera(boolean animateMovement, int stepDelay) {
+        stopDemoBlinking();
+
+        if (!isThirdPersonDemoActive() || demoVisibleNodes == 0) {
+            demoPreviewVisible = false;
+            matrixPanel.clearThirdPersonCamera();
+            return;
+        }
+
+        Point3D current = demoPath.get(demoVisibleNodes - 1);
+        Point3D next = demoVisibleNodes < demoPath.size() ? demoPath.get(demoVisibleNodes) : null;
+        int movementDuration = animateMovement && stepDelay > 0
+                ? Math.clamp((long) stepDelay * 2 / 3, 80, 400)
+                : 0;
+        matrixPanel.setThirdPersonCamera(current, next, animateMovement, movementDuration);
+
+        if (next != null) {
+            startDemoBlinking(stepDelay);
+        }
+    }
+
+    private boolean isThirdPersonDemoActive() {
+        return thirdPersonDemoCheckBox.isSelected()
+                && demoModeCheckBox.isSelected()
+                && mode3DCheckBox.isSelected()
+                && currentGrid != null
+                && currentGrid.depth > 1;
+    }
+
+    private void startDemoBlinking(int stepDelay) {
+        demoPreviewVisible = true;
+        if (stepDelay <= 0) return;
+
+        int blinkInterval = Math.clamp(Math.max(1, stepDelay / 3), 40, 250);
+        demoBlinkTimer = new Timer(blinkInterval, e -> {
+            demoPreviewVisible = !demoPreviewVisible;
+            renderDemoProgress();
+        });
+        demoBlinkTimer.start();
+    }
+
+    private void stopDemoBlinking() {
+        if (demoBlinkTimer != null) {
+            demoBlinkTimer.stop();
+            demoBlinkTimer = null;
+        }
+        demoPreviewVisible = false;
     }
 
     private void stopDemo() {
         stopDemoTimer();
+        stopDemoBlinking();
         demoPath = List.of();
         demoVisibleNodes = 0;
-        matrixPanel.stopCameraFollow();
+        matrixPanel.clearThirdPersonCamera();
     }
 
     private void stopDemoTimer() {

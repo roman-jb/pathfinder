@@ -6,6 +6,10 @@ import java.util.Set;
 public class RenderUtils {
 
     public static Color getCellColor(RenderData data, Point3D p, Set<Point3D> pathSet) {
+        if (data.previewVisible && p.equals(data.previewPoint)) {
+            return new Color(45, 105, 245);
+        }
+
         if (data.pathType == PathType.INTERACTIVE) {
             if (p.equals(data.start)) {
                 return new Color(70, 190, 90);
@@ -99,6 +103,7 @@ public class RenderUtils {
         return p.equals(data.start)
                 || p.equals(data.end)
                 || p.equals(data.interactiveSelected)
+                || (data.previewVisible && p.equals(data.previewPoint))
                 || pathContains(data, p)
                 || data.interactiveFrontier.contains(p);
     }

@@ -23,6 +23,16 @@ public class MatrixPanel extends JPanel {
     private double targetAngleX = angleX;
     private double targetAngleY = angleY;
     private final Timer cameraTimer;
+    private boolean thirdPersonCamera;
+    private double cameraFocusX;
+    private double cameraFocusY;
+    private double cameraFocusZ;
+    private double targetFocusX;
+    private double targetFocusY;
+    private double targetFocusZ;
+    private double headingAngle = Math.PI / 2.0;
+    private double targetHeadingAngle = headingAngle;
+    private double thirdPersonMovementFactor = 0.22;
 
     private int lastMouseX;
     private int lastMouseY;
@@ -96,6 +106,7 @@ public class MatrixPanel extends JPanel {
     }
 
     public void followPath(Point3D from, Point3D to) {
+        thirdPersonCamera = false;
         int dx = to.x() - from.x();
         int dy = to.y() - from.y();
         int dz = to.z() - from.z();
@@ -113,13 +124,69 @@ public class MatrixPanel extends JPanel {
         }
     }
 
+    public void setThirdPersonCamera(
+            Point3D current,
+            Point3D next,
+            boolean animateMovement,
+            int movementDurationMs
+    ) {
+        if (movementDurationMs <= 0) {
+            animateMovement = false;
+        } else {
+            thirdPersonMovementFactor = 1.0 - Math.pow(0.002, 16.0 / movementDurationMs);
+        }
+
+        if (!thirdPersonCamera || !animateMovement) {
+            cameraFocusX = current.x();
+            cameraFocusY = current.y();
+            cameraFocusZ = current.z();
+        }
+
+        thirdPersonCamera = true;
+        targetFocusX = current.x();
+        targetFocusY = current.y();
+        targetFocusZ = current.z();
+
+        if (next != null) {
+            int dx = next.x() - current.x();
+            int dz = next.z() - current.z();
+            if (dx != 0 || dz != 0) {
+                double desiredHeading = Math.atan2(dz, dx);
+                targetHeadingAngle = headingAngle + shortestAngleDifference(headingAngle, desiredHeading);
+                if (!animateMovement) {
+                    headingAngle = targetHeadingAngle;
+                }
+            }
+        }
+
+        if (animateMovement && !cameraTimer.isRunning()) {
+            cameraTimer.start();
+        }
+        repaint();
+    }
+
+    public void clearThirdPersonCamera() {
+        thirdPersonCamera = false;
+        stopCameraFollow();
+        repaint();
+    }
+
     public void stopCameraFollow() {
         cameraTimer.stop();
         targetAngleX = angleX;
         targetAngleY = angleY;
+        targetFocusX = cameraFocusX;
+        targetFocusY = cameraFocusY;
+        targetFocusZ = cameraFocusZ;
+        targetHeadingAngle = headingAngle;
     }
 
     private void animateCamera() {
+        if (thirdPersonCamera) {
+            animateThirdPersonCamera();
+            return;
+        }
+
         double xDifference = targetAngleX - angleX;
         double yDifference = targetAngleY - angleY;
 
@@ -130,6 +197,30 @@ public class MatrixPanel extends JPanel {
         if (Math.abs(xDifference) < 0.002 && Math.abs(yDifference) < 0.002) {
             angleX = targetAngleX;
             angleY = targetAngleY;
+            cameraTimer.stop();
+        }
+    }
+
+    private void animateThirdPersonCamera() {
+        double xDifference = targetFocusX - cameraFocusX;
+        double yDifference = targetFocusY - cameraFocusY;
+        double zDifference = targetFocusZ - cameraFocusZ;
+        double headingDifference = targetHeadingAngle - headingAngle;
+
+        cameraFocusX += xDifference * thirdPersonMovementFactor;
+        cameraFocusY += yDifference * thirdPersonMovementFactor;
+        cameraFocusZ += zDifference * thirdPersonMovementFactor;
+        headingAngle += headingDifference * thirdPersonMovementFactor;
+        repaint();
+
+        if (Math.abs(xDifference) < 0.002
+                && Math.abs(yDifference) < 0.002
+                && Math.abs(zDifference) < 0.002
+                && Math.abs(headingDifference) < 0.002) {
+            cameraFocusX = targetFocusX;
+            cameraFocusY = targetFocusY;
+            cameraFocusZ = targetFocusZ;
+            headingAngle = targetHeadingAngle;
             cameraTimer.stop();
         }
     }
@@ -152,6 +243,19 @@ public class MatrixPanel extends JPanel {
 
         if (data.grid.depth == 1) {
             renderer2D.draw(g2, data, visualScale);
+        } else if (thirdPersonCamera) {
+            renderer3D.drawThirdPerson(
+                    g2,
+                    data,
+                    visualScale,
+                    cameraFocusX,
+                    cameraFocusY,
+                    cameraFocusZ,
+                    Math.cos(headingAngle),
+                    Math.sin(headingAngle),
+                    getWidth(),
+                    getHeight()
+            );
         } else {
             renderer3D.draw(g2, data, visualScale, angleX, angleY, getWidth(), getHeight());
         }

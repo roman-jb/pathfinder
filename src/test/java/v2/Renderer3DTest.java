@@ -76,6 +76,48 @@ class Renderer3DTest {
         assertTrue(countNonWhitePixels(image) > 0);
     }
 
+    @Test
+    void drawsThirdPersonPreviewWithoutThrowingAndChangesPixels() {
+        Grid grid = new Grid(3, 3, 3);
+        fillWeights(grid);
+        Point3D current = new Point3D(1, 1, 1);
+        Point3D next = new Point3D(2, 1, 1);
+        RenderData data = new RenderData(
+                grid,
+                PathType.SHORTEST,
+                current,
+                next,
+                List.of(current),
+                Set.of(),
+                null,
+                false,
+                false,
+                next,
+                true
+        );
+
+        BufferedImage image = new BufferedImage(800, 600, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = image.createGraphics();
+        g2.setColor(Color.WHITE);
+        g2.fillRect(0, 0, image.getWidth(), image.getHeight());
+
+        assertDoesNotThrow(() -> new Renderer3D().drawThirdPerson(
+                g2,
+                data,
+                1.0,
+                current.x(),
+                current.y(),
+                current.z(),
+                1,
+                0,
+                image.getWidth(),
+                image.getHeight()
+        ));
+        g2.dispose();
+
+        assertTrue(countNonWhitePixels(image) > 0);
+    }
+
     private static void fillWeights(Grid grid) {
         for (int z = 0; z < grid.depth; z++) {
             for (int y = 0; y < grid.height; y++) {

@@ -55,4 +55,29 @@ class Projection3DTest {
         assertEquals(300, projected.screenY());
         assertEquals(1.0, projected.scale(), 1e-9);
     }
+
+    @Test
+    void thirdPersonProjectionCentersFocusAndLooksAlongHeading() {
+        Grid grid = new Grid(5, 5, 5);
+        Projection3D projection = Projection3D.thirdPerson(
+                grid,
+                1.0,
+                2,
+                2,
+                2,
+                1,
+                0,
+                800,
+                600
+        );
+
+        ProjectedPoint focus = projection.project(2, 2, 2);
+        ProjectedPoint next = projection.project(3, 2, 2);
+
+        assertEquals(400, focus.screenX());
+        assertEquals(300, focus.screenY());
+        assertEquals(400, next.screenX());
+        assertTrue(next.screenY() < focus.screenY());
+        assertTrue(projection.isVisible(2, 2, 2));
+    }
 }

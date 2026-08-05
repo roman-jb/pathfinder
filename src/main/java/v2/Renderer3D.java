@@ -40,12 +40,50 @@ public class Renderer3D {
             int panelWidth,
             int panelHeight
     ) {
+        Projection3D projection = new Projection3D(
+                data.grid,
+                scale,
+                angleX,
+                angleY,
+                panelWidth,
+                panelHeight
+        );
+        draw(g2, data, scale, projection);
+    }
+
+    public void drawThirdPerson(
+            Graphics2D g2,
+            RenderData data,
+            double scale,
+            double focusX,
+            double focusY,
+            double focusZ,
+            double headingX,
+            double headingZ,
+            int panelWidth,
+            int panelHeight
+    ) {
+        Projection3D projection = Projection3D.thirdPerson(
+                data.grid,
+                scale,
+                focusX,
+                focusY,
+                focusZ,
+                headingX,
+                headingZ,
+                panelWidth,
+                panelHeight
+        );
+        draw(g2, data, scale, projection);
+    }
+
+    private void draw(Graphics2D g2, RenderData data, double scale, Projection3D projection) {
         drawLegend(g2, data);
 
         Set<Point3D> pathSet = data.pathSet;
 
         if (data.pathType == PathType.INTERACTIVE) {
-            drawInteractive(g2, data, scale, angleX, angleY, panelWidth, panelHeight, pathSet);
+            drawInteractive(g2, data, scale, projection, pathSet);
             return;
         }
 
@@ -55,21 +93,13 @@ public class Renderer3D {
 
         Grid grid = data.grid;
 
-        Projection3D projection = new Projection3D(
-                grid,
-                scale,
-                angleX,
-                angleY,
-                panelWidth,
-                panelHeight
-        );
-
         for (int z = 0; z < grid.depth; z++) {
             for (int y = 0; y < grid.height; y++) {
                 for (int x = 0; x < grid.width; x++) {
                     Point3D p = new Point3D(x, y, z);
+                    if (!projection.isVisible(x, y, z)) continue;
 
-                    if (pathSet.contains(p)) {
+                    if (pathSet.contains(p) || (data.previewVisible && p.equals(data.previewPoint))) {
                         pathCubes.add(createCube(
                                 p,
                                 projection,
@@ -105,6 +135,7 @@ public class Renderer3D {
         }
 
         drawPathLines(g2, data.path, projection, scale);
+        drawPreviewLink(g2, data, projection, scale);
 
         for (Cube cube : unusedCubes) {
             drawCube(g2, cube, UNUSED_NODE_COLOR, null, scale, projection);
@@ -119,21 +150,10 @@ public class Renderer3D {
             Graphics2D g2,
             RenderData data,
             double scale,
-            double angleX,
-            double angleY,
-            int panelWidth,
-            int panelHeight,
+            Projection3D projection,
             Set<Point3D> pathSet
     ) {
         Grid grid = data.grid;
-        Projection3D projection = new Projection3D(
-                grid,
-                scale,
-                angleX,
-                angleY,
-                panelWidth,
-                panelHeight
-        );
 
         List<Sphere> spheres = new ArrayList<>();
         List<Cube> pathCubes = new ArrayList<>();
@@ -142,6 +162,7 @@ public class Renderer3D {
             for (int y = 0; y < grid.height; y++) {
                 for (int x = 0; x < grid.width; x++) {
                     Point3D p = new Point3D(x, y, z);
+                    if (!projection.isVisible(x, y, z)) continue;
 
                     if (RenderUtils.isInteractiveVisible(data, p)) {
                         if (pathSet.contains(p) || RenderUtils.isInteractiveBox(data, p)) {
@@ -172,6 +193,7 @@ public class Renderer3D {
         }
 
         drawInteractiveLinks(g2, data, projection, scale);
+        drawPreviewLink(g2, data, projection, scale);
 
         for (Cube cube : pathCubes) {
             drawCube(g2, data, cube, pathSet, scale, projection);
@@ -422,6 +444,29 @@ public class Renderer3D {
             g2.drawLine(a.screenX(), a.screenY(), b.screenX(), b.screenY());
         }
 
+        g2.setStroke(new BasicStroke(1f));
+    }
+
+    private void drawPreviewLink(
+            Graphics2D g2,
+            RenderData data,
+            Projection3D projection,
+            double scale
+    ) {
+        if (!data.previewVisible || data.previewPoint == null || data.path.isEmpty()) return;
+
+        Point3D current = data.path.getLast();
+        Point3D next = data.previewPoint;
+        ProjectedPoint a = projection.project(current.x(), current.y(), current.z());
+        ProjectedPoint b = projection.project(next.x(), next.y(), next.z());
+
+        g2.setStroke(new BasicStroke(
+                Math.max(2f, (float) (6f * scale)),
+                BasicStroke.CAP_ROUND,
+                BasicStroke.JOIN_ROUND
+        ));
+        g2.setColor(new Color(45, 105, 245, 220));
+        g2.drawLine(a.screenX(), a.screenY(), b.screenX(), b.screenY());
         g2.setStroke(new BasicStroke(1f));
     }
 }
