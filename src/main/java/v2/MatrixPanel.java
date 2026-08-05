@@ -20,6 +20,9 @@ public class MatrixPanel extends JPanel {
 
     private double angleX = -0.65;
     private double angleY = 0.75;
+    private double targetAngleX = angleX;
+    private double targetAngleY = angleY;
+    private final Timer cameraTimer;
 
     private int lastMouseX;
     private int lastMouseY;
@@ -28,9 +31,12 @@ public class MatrixPanel extends JPanel {
     public MatrixPanel() {
         setBackground(new Color(245, 247, 250));
 
+        cameraTimer = new Timer(16, e -> animateCamera());
+
         MouseAdapter mouseAdapter = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                stopCameraFollow();
                 lastMouseX = e.getX();
                 lastMouseY = e.getY();
                 dragged = false;
@@ -87,6 +93,49 @@ public class MatrixPanel extends JPanel {
     public void setScale(double visualScale) {
         this.visualScale = visualScale;
         repaint();
+    }
+
+    public void followPath(Point3D from, Point3D to) {
+        int dx = to.x() - from.x();
+        int dy = to.y() - from.y();
+        int dz = to.z() - from.z();
+
+        if (dx != 0 || dz != 0) {
+            double desiredYaw = Math.atan2(dz, dx) + Math.PI / 4.0;
+            targetAngleY = angleY + shortestAngleDifference(angleY, desiredYaw);
+        }
+
+        double verticalDirection = Math.atan2(dy, Math.max(1.0, Math.hypot(dx, dz)));
+        targetAngleX = Math.clamp(-0.65 + verticalDirection * 0.35, -1.25, -0.15);
+
+        if (!cameraTimer.isRunning()) {
+            cameraTimer.start();
+        }
+    }
+
+    public void stopCameraFollow() {
+        cameraTimer.stop();
+        targetAngleX = angleX;
+        targetAngleY = angleY;
+    }
+
+    private void animateCamera() {
+        double xDifference = targetAngleX - angleX;
+        double yDifference = targetAngleY - angleY;
+
+        angleX += xDifference * 0.18;
+        angleY += yDifference * 0.18;
+        repaint();
+
+        if (Math.abs(xDifference) < 0.002 && Math.abs(yDifference) < 0.002) {
+            angleX = targetAngleX;
+            angleY = targetAngleY;
+            cameraTimer.stop();
+        }
+    }
+
+    private double shortestAngleDifference(double from, double to) {
+        return Math.atan2(Math.sin(to - from), Math.cos(to - from));
     }
 
     @Override

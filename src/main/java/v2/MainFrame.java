@@ -11,11 +11,14 @@ public class MainFrame extends JFrame {
 
     private final JCheckBox mode3DCheckBox = new JCheckBox("3D mode");
     private final JCheckBox hideUnusedNodesCheckBox = new JCheckBox("Hide unused nodes");
+    private final JCheckBox demoModeCheckBox = new JCheckBox("DEMO MODE");
     private final JComboBox<PathType> pathTypeBox = new JComboBox<>(PathType.values());
 
     private final JTextField widthField = new JTextField("8", 4);
     private final JTextField heightField = new JTextField("8", 4);
     private final JTextField depthField = new JTextField("4", 4);
+    private final JTextField stepDelayField = new JTextField("250", 5);
+    private final JTextField cycleDelayField = new JTextField("1000", 5);
 
     private final JSlider scaleSlider = new JSlider(30, 150, 100);
 
@@ -33,6 +36,10 @@ public class MainFrame extends JFrame {
     private Point3D interactivePending;
     private boolean interactiveComplete;
 
+    private Timer demoTimer;
+    private List<Point3D> demoPath = List.of();
+    private int demoVisibleNodes;
+
     public MainFrame() {
         super("Pathfinding 2D / 3D");
 
@@ -42,6 +49,7 @@ public class MainFrame extends JFrame {
 
         controls.add(mode3DCheckBox);
         controls.add(hideUnusedNodesCheckBox);
+        controls.add(demoModeCheckBox);
 
         controls.add(new JLabel("Path type:"));
         controls.add(pathTypeBox);
@@ -57,6 +65,12 @@ public class MainFrame extends JFrame {
 
         controls.add(new JLabel("Scale:"));
         controls.add(scaleSlider);
+
+        controls.add(new JLabel("Step delay (ms):"));
+        controls.add(stepDelayField);
+
+        controls.add(new JLabel("Cycle delay (ms):"));
+        controls.add(cycleDelayField);
 
         controls.add(generateButton);
         controls.add(rerollPointsButton);
@@ -81,20 +95,44 @@ public class MainFrame extends JFrame {
         generateButton.addActionListener(e -> generateMatrix());
         rerollPointsButton.addActionListener(e -> rerollStartEnd());
 
+        demoModeCheckBox.addActionListener(e -> {
+            if (demoModeCheckBox.isSelected()) {
+                if (currentGrid == null) {
+                    if (!generateMatrix()) {
+                        demoModeCheckBox.setSelected(false);
+                    }
+                } else {
+                    startDemoCycle();
+                }
+            } else {
+                stopDemo();
+                syncPathStateToSelection();
+                refreshDisplay();
+            }
+        });
+
         mode3DCheckBox.addActionListener(e ->
                 depthField.setEnabled(mode3DCheckBox.isSelected())
         );
 
         pathTypeBox.addActionListener(e -> {
             if (currentGrid != null) {
-                syncPathStateToSelection();
-                refreshDisplay();
+                if (demoModeCheckBox.isSelected()) {
+                    startDemoCycle();
+                } else {
+                    syncPathStateToSelection();
+                    refreshDisplay();
+                }
             }
         });
 
         hideUnusedNodesCheckBox.addActionListener(e -> {
             if (currentGrid != null) {
-                refreshDisplay();
+                if (demoModeCheckBox.isSelected()) {
+                    renderDemoProgress();
+                } else {
+                    refreshDisplay();
+                }
             }
         });
 
@@ -108,21 +146,47 @@ public class MainFrame extends JFrame {
         setVisible(true);
     }
 
-    private void generateMatrix() {
+    private boolean generateMatrix() {
         boolean is3D = mode3DCheckBox.isSelected();
 
-        int width = Integer.parseInt(widthField.getText());
-        int height = Integer.parseInt(heightField.getText());
-        int depth = is3D ? Integer.parseInt(depthField.getText()) : 1;
+        int width;
+        int height;
+        int depth;
+        try {
+            width = parsePositiveInt(widthField, "Width");
+            height = parsePositiveInt(heightField, "Height");
+            depth = is3D ? parsePositiveInt(depthField, "Depth") : 1;
+        } catch (IllegalArgumentException exception) {
+            JOptionPane.showMessageDialog(this, exception.getMessage(), "Invalid matrix size", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
 
         currentGrid = new Grid(width, height, depth);
         currentGrid.randomizeWeights();
 
         rerollPointsButton.setEnabled(true);
-        rerollStartEnd();
+        if (demoModeCheckBox.isSelected()) {
+            startDemoCycle();
+        } else {
+            rerollStartEnd();
+        }
+        return true;
     }
 
     private void rerollStartEnd() {
+        if (currentGrid == null) return;
+
+        chooseRandomStartEnd();
+
+        if (demoModeCheckBox.isSelected()) {
+            beginPathAnimation();
+        } else {
+            syncPathStateToSelection();
+            refreshDisplay();
+        }
+    }
+
+    private void chooseRandomStartEnd() {
         if (currentGrid == null) return;
 
         currentStart = currentGrid.randomPoint();
@@ -136,8 +200,116 @@ public class MainFrame extends JFrame {
             } while (currentEnd.equals(currentStart));
         }
 
-        syncPathStateToSelection();
-        refreshDisplay();
+    }
+
+    private void startDemoCycle() {
+        if (!demoModeCheckBox.isSelected() || currentGrid == null) return;
+
+        stopDemoTimer();
+        chooseRandomStartEnd();
+        beginPathAnimation();
+    }
+
+    private void beginPathAnimation() {
+        stopDemoTimer();
+
+        demoPath = Pathfinder.findPath(currentGrid, currentStart, currentEnd, currentPathType());
+        demoVisibleNodes = Math.min(1, demoPath.size());
+        renderDemoProgress();
+        if (demoVisibleNodes < demoPath.size()) {
+            scheduleNextDemoStep(readDelay(stepDelayField, 250));
+        } else {
+            scheduleNextDemoCycle(readDelay(cycleDelayField, 1000));
+        }
+    }
+
+    private void scheduleNextDemoStep(int delay) {
+        if (!demoModeCheckBox.isSelected()) return;
+
+        demoTimer = new Timer(delay, e -> advanceDemo());
+        demoTimer.setRepeats(false);
+        demoTimer.start();
+    }
+
+    private void advanceDemo() {
+        if (!demoModeCheckBox.isSelected()) return;
+
+        if (demoVisibleNodes < demoPath.size()) {
+            Point3D previous = demoPath.get(demoVisibleNodes - 1);
+            Point3D next = demoPath.get(demoVisibleNodes);
+            demoVisibleNodes++;
+
+            if (mode3DCheckBox.isSelected() && currentGrid.depth > 1) {
+                matrixPanel.followPath(previous, next);
+            }
+
+            renderDemoProgress();
+            if (demoVisibleNodes < demoPath.size()) {
+                scheduleNextDemoStep(readDelay(stepDelayField, 250));
+            } else {
+                scheduleNextDemoCycle(readDelay(cycleDelayField, 1000));
+            }
+        }
+    }
+
+    private void scheduleNextDemoCycle(int delay) {
+        demoTimer = new Timer(delay, e -> startDemoCycle());
+        demoTimer.setRepeats(false);
+        demoTimer.start();
+    }
+
+    private void renderDemoProgress() {
+        List<Point3D> visiblePath = new ArrayList<>(demoPath.subList(0, demoVisibleNodes));
+
+        pathLengthLabel.setText("Length: " + Math.max(0, visiblePath.size() - 1));
+        pathCostLabel.setText("Cost: " + currentGrid.calculatePathCost(visiblePath));
+
+        matrixPanel.setData(new RenderData(
+                currentGrid,
+                currentPathType(),
+                currentStart,
+                currentEnd,
+                visiblePath,
+                Set.of(),
+                null,
+                demoVisibleNodes == demoPath.size(),
+                hideUnusedNodesCheckBox.isSelected()
+        ));
+    }
+
+    private void stopDemo() {
+        stopDemoTimer();
+        demoPath = List.of();
+        demoVisibleNodes = 0;
+        matrixPanel.stopCameraFollow();
+    }
+
+    private void stopDemoTimer() {
+        if (demoTimer != null) {
+            demoTimer.stop();
+            demoTimer = null;
+        }
+    }
+
+    private int parsePositiveInt(JTextField field, String name) {
+        try {
+            int value = Integer.parseInt(field.getText().trim());
+            if (value <= 0) throw new NumberFormatException();
+            return value;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(name + " must be a positive whole number.");
+        }
+    }
+
+    private int readDelay(JTextField field, int fallback) {
+        try {
+            int value = Integer.parseInt(field.getText().trim());
+            if (value < 0) throw new NumberFormatException();
+            return value;
+        } catch (NumberFormatException exception) {
+            field.setText(Integer.toString(fallback));
+            return fallback;
+        }
     }
 
     private void refreshDisplay() {
@@ -215,6 +387,7 @@ public class MainFrame extends JFrame {
 
     private void handleNodeClick(Point3D point) {
         if (currentGrid == null
+                || demoModeCheckBox.isSelected()
                 || currentPathType() != PathType.INTERACTIVE
                 || interactiveComplete) {
             return;
