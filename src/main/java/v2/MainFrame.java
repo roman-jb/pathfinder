@@ -1,7 +1,11 @@
 package v2;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashSet;
@@ -11,6 +15,8 @@ import java.util.Map;
 import java.util.Set;
 
 public class MainFrame extends JFrame {
+
+    private static final List<Image> APPLICATION_ICONS = loadApplicationIcons();
 
     private final JCheckBox mode3DCheckBox = new JCheckBox("3D mode");
     private final JCheckBox hideUnusedNodesCheckBox = new JCheckBox("Hide unused nodes");
@@ -55,6 +61,8 @@ public class MainFrame extends JFrame {
 
     public MainFrame() {
         super("Pathfinding 2D / 3D");
+        applyApplicationIcons(this);
+        applyTaskbarIcon();
 
         registerUiElements();
 
@@ -215,6 +223,7 @@ public class MainFrame extends JFrame {
 
     private void createOptionsWindow() {
         optionsDialog = new JDialog(this, "OPTIONS", false);
+        applyApplicationIcons(optionsDialog);
         optionsDialog.setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
         optionsDialog.setLayout(new BorderLayout(8, 8));
 
@@ -236,6 +245,7 @@ public class MainFrame extends JFrame {
 
     private void showEditUiWindow() {
         JDialog editDialog = new JDialog(optionsDialog, "Edit UI", Dialog.ModalityType.APPLICATION_MODAL);
+        applyApplicationIcons(editDialog);
         editDialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         editDialog.setLayout(new BorderLayout(8, 8));
 
@@ -253,6 +263,61 @@ public class MainFrame extends JFrame {
 
         editDialog.add(new JScrollPane(listPanel), BorderLayout.CENTER);
 
+        JPanel bottomPanel = getBottomPanel(editDialog, checkBoxes);
+        editDialog.add(bottomPanel, BorderLayout.SOUTH);
+
+        editDialog.setSize(400, 520);
+        editDialog.setLocationRelativeTo(optionsDialog);
+        editDialog.setVisible(true);
+    }
+
+    private static List<Image> loadApplicationIcons() {
+        try (InputStream input = MainFrame.class.getResourceAsStream("/v2/app-icon.png")) {
+            if (input == null) return List.of();
+
+            BufferedImage source = ImageIO.read(input);
+            if (source == null) return List.of();
+
+            int[] sizes = {16, 20, 24, 32, 40, 48, 64, 128, 256};
+            List<Image> icons = new ArrayList<>(sizes.length + 1);
+            for (int size : sizes) {
+                BufferedImage scaled = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+                Graphics2D graphics = scaled.createGraphics();
+                graphics.setRenderingHint(
+                        RenderingHints.KEY_INTERPOLATION,
+                        RenderingHints.VALUE_INTERPOLATION_BICUBIC
+                );
+                graphics.drawImage(source, 0, 0, size, size, null);
+                graphics.dispose();
+                icons.add(scaled);
+            }
+            icons.add(source);
+            return List.copyOf(icons);
+        } catch (IOException exception) {
+            return List.of();
+        }
+    }
+
+    private static void applyApplicationIcons(Window window) {
+        if (!APPLICATION_ICONS.isEmpty()) {
+            window.setIconImages(APPLICATION_ICONS);
+        }
+    }
+
+    private static void applyTaskbarIcon() {
+        if (APPLICATION_ICONS.isEmpty() || !Taskbar.isTaskbarSupported()) return;
+
+        Taskbar taskbar = Taskbar.getTaskbar();
+        if (taskbar.isSupported(Taskbar.Feature.ICON_IMAGE)) {
+            try {
+                taskbar.setIconImage(APPLICATION_ICONS.getLast());
+            } catch (SecurityException | UnsupportedOperationException ignored) {
+                // Window icons still apply when the platform disallows changing the taskbar icon.
+            }
+        }
+    }
+
+    private JPanel getBottomPanel(JDialog editDialog, Map<UiElement, JCheckBox> checkBoxes) {
         JButton cancelButton = new JButton("Cancel");
         cancelButton.addActionListener(e -> editDialog.dispose());
 
@@ -269,11 +334,7 @@ public class MainFrame extends JFrame {
         bottomPanel.setBorder(BorderFactory.createEmptyBorder(4, 12, 10, 12));
         bottomPanel.add(cancelButton, BorderLayout.WEST);
         bottomPanel.add(okButton, BorderLayout.EAST);
-        editDialog.add(bottomPanel, BorderLayout.SOUTH);
-
-        editDialog.setSize(400, 520);
-        editDialog.setLocationRelativeTo(optionsDialog);
-        editDialog.setVisible(true);
+        return bottomPanel;
     }
 
     private void rebuildControlLocations() {
