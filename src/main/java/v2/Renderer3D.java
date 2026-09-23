@@ -99,7 +99,8 @@ public class Renderer3D {
                     Point3D p = new Point3D(x, y, z);
                     if (!projection.isVisible(x, y, z)) continue;
 
-                    if (pathSet.contains(p) || (data.previewVisible && p.equals(data.previewPoint))) {
+                    if (p.equals(data.start) || p.equals(data.end)
+                            || pathSet.contains(p) || (data.previewVisible && p.equals(data.previewPoint))) {
                         pathCubes.add(createCube(
                                 p,
                                 projection,

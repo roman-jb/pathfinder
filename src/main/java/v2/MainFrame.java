@@ -53,10 +53,18 @@ public class MainFrame extends JFrame {
     private Point3D interactivePending;
     private boolean interactiveComplete;
 
-    private Timer demoTimer;
+    private final JButton demoPlayPauseButton = new JButton("Pause");
+    private final JButton demoNextButton = new JButton("Next >|");
+    private final JButton demoPreviousButton = new JButton("|< Previous");
+    private final JPanel demoPlaybackPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 0));
+    private final DemoPlayback demoPlayback = new DemoPlayback(
+            () -> readDelay(stepDelayField, 250),
+            () -> readDelay(cycleDelayField, 1000),
+            this::updateDemoProgress,
+            this::startDemoCycle
+    );
     private Timer demoBlinkTimer;
     private List<Point3D> demoPath = List.of();
-    private int demoVisibleNodes;
     private boolean demoPreviewVisible;
 
     public MainFrame() {
@@ -68,6 +76,14 @@ public class MainFrame extends JFrame {
 
         JPanel topBar = new JPanel(new BorderLayout());
         topBar.add(mainControlsPanel, BorderLayout.CENTER);
+        demoPlaybackPanel.add(demoPreviousButton);
+        demoPlaybackPanel.add(demoPlayPauseButton);
+        demoPlaybackPanel.add(demoNextButton);
+        demoPlayPauseButton.setToolTipText("Pause or resume demo playback");
+        demoPreviousButton.setToolTipText("Move back one node while paused");
+        demoNextButton.setToolTipText("Advance one node while paused");
+        topBar.add(demoPlaybackPanel, BorderLayout.SOUTH);
+        updateDemoControls();
 
         JPanel optionsButtonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton optionsButton = new JButton("OPTIONS");
@@ -94,6 +110,10 @@ public class MainFrame extends JFrame {
         rerollPointsButton.addActionListener(e -> rerollStartEnd());
         optionsButton.addActionListener(e -> showOptionsWindow());
 
+        demoPlayPauseButton.addActionListener(e -> demoPlayback.togglePaused());
+        demoNextButton.addActionListener(e -> demoPlayback.next());
+        demoPreviousButton.addActionListener(e -> demoPlayback.previous());
+
         demoModeCheckBox.addActionListener(e -> {
             if (demoModeCheckBox.isSelected()) {
                 if (currentGrid != null && currentStart != null && currentEnd != null) {
@@ -104,6 +124,7 @@ public class MainFrame extends JFrame {
                 syncPathStateToSelection();
                 refreshDisplay();
             }
+            updateDemoControls();
         });
 
         thirdPersonDemoCheckBox.addActionListener(e -> {
@@ -404,7 +425,7 @@ public class MainFrame extends JFrame {
         }
     }
 
-    private boolean generateMatrix() {
+    private void generateMatrix() {
         boolean is3D = mode3DCheckBox.isSelected();
 
         int width;
@@ -416,7 +437,7 @@ public class MainFrame extends JFrame {
             depth = is3D ? parsePositiveInt(depthField, "Depth") : 1;
         } catch (IllegalArgumentException exception) {
             JOptionPane.showMessageDialog(this, exception.getMessage(), "Invalid matrix size", JOptionPane.ERROR_MESSAGE);
-            return false;
+            return;
         }
 
         currentGrid = new Grid(width, height, depth);
@@ -433,7 +454,6 @@ public class MainFrame extends JFrame {
         pathLengthLabel.setText("Length: -");
         pathCostLabel.setText("Cost: -");
         renderMatrixWithoutPoints();
-        return true;
     }
 
     private void renderMatrixWithoutPoints() {
@@ -480,68 +500,42 @@ public class MainFrame extends JFrame {
     }
 
     private void startDemoCycle() {
-        if (!demoModeCheckBox.isSelected() || currentGrid == null) return;
+        if (!demoModeCheckBox.isSelected() || demoPlayback.isPaused() || currentGrid == null) return;
 
-        stopDemoTimer();
         chooseRandomStartEnd();
         beginPathAnimation();
     }
 
     private void beginPathAnimation() {
-        stopDemoTimer();
-
         demoPath = Pathfinder.findPath(currentGrid, currentStart, currentEnd, currentPathType());
-        demoVisibleNodes = Math.min(1, demoPath.size());
+        demoPlayback.start(demoPath.size());
+    }
+
+    private void updateDemoProgress(int direction) {
         int stepDelay = readDelay(stepDelayField, 250);
-        prepareDemoCamera(false, stepDelay);
+        if (demoPlayback.isPaused()) {
+            matrixPanel.stopCameraFollow();
+        }
+        if (isThirdPersonDemoActive() || direction == 0) {
+            prepareDemoCamera(direction != 0 && !demoPlayback.isPaused(), stepDelay);
+        } else if (mode3DCheckBox.isSelected() && currentGrid.depth > 1) {
+            int currentIndex = demoPlayback.visibleNodes() - 1;
+            matrixPanel.followPath(demoPath.get(currentIndex - direction), demoPath.get(currentIndex));
+        }
         renderDemoProgress();
-        if (demoVisibleNodes < demoPath.size()) {
-            scheduleNextDemoStep(stepDelay);
-        } else {
-            scheduleNextDemoCycle(readDelay(cycleDelayField, 1000));
-        }
+        updateDemoControls();
     }
 
-    private void scheduleNextDemoStep(int delay) {
-        if (!demoModeCheckBox.isSelected()) return;
-
-        demoTimer = new Timer(delay, e -> advanceDemo());
-        demoTimer.setRepeats(false);
-        demoTimer.start();
-    }
-
-    private void advanceDemo() {
-        if (!demoModeCheckBox.isSelected()) return;
-
-        if (demoVisibleNodes < demoPath.size()) {
-            Point3D previous = demoPath.get(demoVisibleNodes - 1);
-            Point3D next = demoPath.get(demoVisibleNodes);
-            stopDemoBlinking();
-            demoVisibleNodes++;
-
-            int stepDelay = readDelay(stepDelayField, 250);
-            if (isThirdPersonDemoActive()) {
-                prepareDemoCamera(true, stepDelay);
-            } else if (mode3DCheckBox.isSelected() && currentGrid.depth > 1) {
-                matrixPanel.followPath(previous, next);
-            }
-
-            renderDemoProgress();
-            if (demoVisibleNodes < demoPath.size()) {
-                scheduleNextDemoStep(stepDelay);
-            } else {
-                scheduleNextDemoCycle(readDelay(cycleDelayField, 1000));
-            }
-        }
-    }
-
-    private void scheduleNextDemoCycle(int delay) {
-        demoTimer = new Timer(delay, e -> startDemoCycle());
-        demoTimer.setRepeats(false);
-        demoTimer.start();
+    private void updateDemoControls() {
+        demoPlaybackPanel.setVisible(demoModeCheckBox.isSelected());
+        demoPlayPauseButton.setText(demoPlayback.isPaused() ? "Play" : "Pause");
+        demoPlayPauseButton.setEnabled(demoModeCheckBox.isSelected() && demoPlayback.isActive());
+        demoNextButton.setEnabled(demoPlayback.canNext());
+        demoPreviousButton.setEnabled(demoPlayback.canPrevious());
     }
 
     private void renderDemoProgress() {
+        int demoVisibleNodes = demoPlayback.visibleNodes();
         List<Point3D> visiblePath = new ArrayList<>(demoPath.subList(0, demoVisibleNodes));
         Point3D previewPoint = isThirdPersonDemoActive() && demoVisibleNodes < demoPath.size()
                 ? demoPath.get(demoVisibleNodes)
@@ -567,6 +561,7 @@ public class MainFrame extends JFrame {
 
     private void prepareDemoCamera(boolean animateMovement, int stepDelay) {
         stopDemoBlinking();
+        int demoVisibleNodes = demoPlayback.visibleNodes();
 
         if (!isThirdPersonDemoActive() || demoVisibleNodes == 0) {
             demoPreviewVisible = false;
@@ -596,7 +591,7 @@ public class MainFrame extends JFrame {
 
     private void startDemoBlinking(int stepDelay) {
         demoPreviewVisible = true;
-        if (stepDelay <= 0) return;
+        if (stepDelay <= 0 || demoPlayback.isPaused()) return;
 
         int blinkInterval = Math.clamp(Math.max(1, stepDelay / 3), 40, 250);
         demoBlinkTimer = new Timer(blinkInterval, e -> {
@@ -615,18 +610,11 @@ public class MainFrame extends JFrame {
     }
 
     private void stopDemo() {
-        stopDemoTimer();
+        demoPlayback.stop();
         stopDemoBlinking();
         demoPath = List.of();
-        demoVisibleNodes = 0;
         matrixPanel.clearThirdPersonCamera();
-    }
-
-    private void stopDemoTimer() {
-        if (demoTimer != null) {
-            demoTimer.stop();
-            demoTimer = null;
-        }
+        updateDemoControls();
     }
 
     private int parsePositiveInt(JTextField field, String name) {

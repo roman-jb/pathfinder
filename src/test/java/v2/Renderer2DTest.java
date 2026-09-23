@@ -1,6 +1,8 @@
 package v2;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -11,6 +13,35 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class Renderer2DTest {
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void displaysBothEndpointsAtDemoCycleStart(boolean hideUnusedNodes) {
+        Grid grid = new Grid(3, 1, 1);
+        fillWeights(grid);
+        Point3D start = new Point3D(0, 0, 0);
+        Point3D end = new Point3D(2, 0, 0);
+        RenderData data = new RenderData(
+                grid, PathType.SHORTEST, start, end, List.of(start),
+                Set.of(), null, false, hideUnusedNodes
+        );
+
+        BufferedImage image = new BufferedImage(200, 100, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = image.createGraphics();
+        try {
+            g2.setColor(Color.WHITE);
+            g2.fillRect(0, 0, image.getWidth(), image.getHeight());
+            new Renderer2D().draw(g2, data, 1.0);
+        } finally {
+            g2.dispose();
+        }
+
+        assertEquals(new Color(70, 190, 90).getRGB(), image.getRGB(45, 45));
+        assertEquals(new Color(230, 75, 75).getRGB(), image.getRGB(135, 45));
+        if (hideUnusedNodes) {
+            assertEquals(Color.WHITE.getRGB(), image.getRGB(90, 45));
+        }
+    }
 
     @Test
     void drawsStandard2DViewWithoutThrowingAndChangesPixels() {

@@ -1,7 +1,10 @@
 package v2;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
+import javax.swing.SwingUtilities;
 import java.awt.Color;
 import java.util.List;
 import java.util.Set;
@@ -149,5 +152,94 @@ class RenderUtilsTest {
         assertEquals(new Color(110, 165, 220), RenderUtils.brighten(color, 1.1));
         assertEquals(new Color(0, 0, 0), RenderUtils.darken(color, 0.0));
         assertEquals(new Color(255, 255, 255), RenderUtils.brighten(new Color(250, 250, 250), 2.0));
+    }
+
+    @ParameterizedTest
+    @EnumSource(PathType.class)
+    void pausedStepsAddAndRemovePathHighlight(PathType pathType) throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            Grid grid = new Grid(3, 1, 1);
+            grid.weights[0][0][1] = 7;
+            Point3D start = new Point3D(0, 0, 0);
+            Point3D middle = new Point3D(1, 0, 0);
+            Point3D end = new Point3D(2, 0, 0);
+            List<Point3D> path = List.of(start, middle, end);
+            DemoPlayback playback = new DemoPlayback(() -> 60_000, () -> 60_000, direction -> {}, () -> {});
+            try {
+                playback.start(path.size());
+                playback.togglePaused();
+                RenderData initial = demoData(grid, pathType, path, playback, false);
+                Color unusedColor = RenderUtils.getCellColor(initial, middle, initial.pathSet);
+
+                playback.next();
+                RenderData advanced = demoData(grid, pathType, path, playback, false);
+                assertEquals(new Color(75, 145, 235), RenderUtils.getCellColor(advanced, middle, advanced.pathSet));
+                assertTrue(RenderUtils.pathContains(advanced, middle));
+
+                playback.previous();
+                RenderData rewound = demoData(grid, pathType, path, playback, false);
+                assertEquals(unusedColor, RenderUtils.getCellColor(rewound, middle, rewound.pathSet));
+                assertFalse(RenderUtils.pathContains(rewound, middle));
+                assertEquals(new Color(70, 190, 90), RenderUtils.getCellColor(rewound, start, rewound.pathSet));
+                assertEquals(new Color(230, 75, 75), RenderUtils.getCellColor(rewound, end, rewound.pathSet));
+                assertEquals("S", RenderUtils.getCellText(rewound, start));
+                assertEquals("E", RenderUtils.getCellText(rewound, end));
+                if (pathType == PathType.INTERACTIVE) {
+                    assertFalse(RenderUtils.isInteractiveVisible(rewound, middle));
+                }
+            } finally {
+                playback.stop();
+            }
+        });
+    }
+
+    @ParameterizedTest
+    @EnumSource(PathType.class)
+    void pausedPreviewFollowsNextNodeWhenSteppingForwardAndBackward(PathType pathType) throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            Grid grid = new Grid(3, 1, 2);
+            Point3D start = new Point3D(0, 0, 0);
+            Point3D middle = new Point3D(1, 0, 0);
+            Point3D end = new Point3D(2, 0, 0);
+            List<Point3D> path = List.of(start, middle, end);
+            Color previewColor = new Color(45, 105, 245);
+            DemoPlayback playback = new DemoPlayback(() -> 60_000, () -> 60_000, direction -> {}, () -> {});
+            try {
+                playback.start(path.size());
+                playback.togglePaused();
+                RenderData initial = demoData(grid, pathType, path, playback, true);
+                assertEquals(previewColor, RenderUtils.getCellColor(initial, middle, initial.pathSet));
+
+                playback.next();
+                RenderData advanced = demoData(grid, pathType, path, playback, true);
+                assertEquals(new Color(75, 145, 235), RenderUtils.getCellColor(advanced, middle, advanced.pathSet));
+                assertEquals(previewColor, RenderUtils.getCellColor(advanced, end, advanced.pathSet));
+
+                playback.next();
+                RenderData complete = demoData(grid, pathType, path, playback, true);
+                assertEquals(new Color(230, 75, 75), RenderUtils.getCellColor(complete, end, complete.pathSet));
+
+                playback.previous();
+                playback.previous();
+                RenderData rewound = demoData(grid, pathType, path, playback, true);
+                assertEquals(previewColor, RenderUtils.getCellColor(rewound, middle, rewound.pathSet));
+                assertEquals(new Color(230, 75, 75), RenderUtils.getCellColor(rewound, end, rewound.pathSet));
+                if (pathType == PathType.INTERACTIVE) {
+                    assertTrue(RenderUtils.isInteractiveVisible(rewound, middle));
+                }
+            } finally {
+                playback.stop();
+            }
+        });
+    }
+
+    private RenderData demoData(Grid grid, PathType pathType, List<Point3D> path,
+                                DemoPlayback playback, boolean showPreview) {
+        int visibleNodes = playback.visibleNodes();
+        Point3D preview = showPreview && visibleNodes < path.size() ? path.get(visibleNodes) : null;
+        return new RenderData(
+                grid, pathType, path.getFirst(), path.getLast(), List.copyOf(path.subList(0, visibleNodes)),
+                Set.of(), null, visibleNodes == path.size(), true, preview, preview != null
+        );
     }
 }

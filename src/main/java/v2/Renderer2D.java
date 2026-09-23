@@ -28,7 +28,8 @@ public class Renderer2D {
             for (int x = 0; x < grid.width; x++) {
                 Point3D p = new Point3D(x, y, 0);
 
-                if (data.hideUnusedNodes && !pathSet.contains(p)) {
+                if (data.hideUnusedNodes && !pathSet.contains(p)
+                        && !p.equals(data.start) && !p.equals(data.end)) {
                     continue;
                 }
 

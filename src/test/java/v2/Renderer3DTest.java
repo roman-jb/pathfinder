@@ -1,6 +1,8 @@
 package v2;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -11,6 +13,43 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class Renderer3DTest {
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void displaysBothEndpointsAtDemoCycleStart(boolean hideUnusedNodes) {
+        Grid grid = new Grid(3, 3, 3);
+        fillWeights(grid);
+        Point3D start = new Point3D(0, 0, 0);
+        Point3D end = new Point3D(2, 2, 2);
+        RenderData data = new RenderData(
+                grid, PathType.SHORTEST, start, end, List.of(start),
+                Set.of(), null, false, hideUnusedNodes
+        );
+
+        BufferedImage image = new BufferedImage(800, 600, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = image.createGraphics();
+        try {
+            g2.setColor(Color.WHITE);
+            g2.fillRect(0, 0, image.getWidth(), image.getHeight());
+            new Renderer3D().draw(g2, data, 1.0, -0.65, 0.75, image.getWidth(), image.getHeight());
+        } finally {
+            g2.dispose();
+        }
+
+        boolean startVisible = false;
+        boolean endVisible = false;
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                Color pixel = new Color(image.getRGB(x, y));
+                startVisible |= pixel.getGreen() > pixel.getRed() + 50
+                        && pixel.getGreen() > pixel.getBlue() + 50;
+                endVisible |= pixel.getRed() > pixel.getGreen() + 50
+                        && pixel.getRed() > pixel.getBlue() + 50;
+            }
+        }
+        assertTrue(startVisible, "START should be rendered in green");
+        assertTrue(endVisible, "END should be rendered in red before the path reaches it");
+    }
 
     @Test
     void drawsStandard3DViewWithoutThrowingAndChangesPixels() {
