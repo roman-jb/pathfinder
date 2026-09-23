@@ -18,7 +18,6 @@ public class MainFrame extends JFrame {
 
     private static final List<Image> APPLICATION_ICONS = loadApplicationIcons();
 
-    private final JCheckBox mode3DCheckBox = new JCheckBox("3D mode");
     private final JCheckBox hideUnusedNodesCheckBox = new JCheckBox("Hide unused nodes");
     private final JCheckBox demoModeCheckBox = new JCheckBox("DEMO MODE");
     private final JCheckBox thirdPersonDemoCheckBox = new JCheckBox("DEMO MODE - 3rd person camera");
@@ -26,7 +25,7 @@ public class MainFrame extends JFrame {
 
     private final JTextField widthField = new JTextField("8", 4);
     private final JTextField heightField = new JTextField("8", 4);
-    private final JTextField depthField = new JTextField("4", 4);
+    private final JTextField depthField = new JTextField("8", 4);
     private final JTextField stepDelayField = new JTextField("250", 5);
     private final JTextField cycleDelayField = new JTextField("1000", 5);
 
@@ -53,9 +52,9 @@ public class MainFrame extends JFrame {
     private Point3D interactivePending;
     private boolean interactiveComplete;
 
-    private final JButton demoPlayPauseButton = new JButton("Pause");
-    private final JButton demoNextButton = new JButton("Next >|");
-    private final JButton demoPreviousButton = new JButton("|< Previous");
+    private final JButton demoPlayPauseButton = new JButton(PlaybackIcon.PAUSE);
+    private final JButton demoNextButton = new JButton(PlaybackIcon.NEXT);
+    private final JButton demoPreviousButton = new JButton(PlaybackIcon.PREVIOUS);
     private final JPanel demoPlaybackPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 0));
     private final DemoPlayback demoPlayback = new DemoPlayback(
             () -> readDelay(stepDelayField, 250),
@@ -79,9 +78,10 @@ public class MainFrame extends JFrame {
         demoPlaybackPanel.add(demoPreviousButton);
         demoPlaybackPanel.add(demoPlayPauseButton);
         demoPlaybackPanel.add(demoNextButton);
-        demoPlayPauseButton.setToolTipText("Pause or resume demo playback");
         demoPreviousButton.setToolTipText("Move back one node while paused");
         demoNextButton.setToolTipText("Advance one node while paused");
+        demoPreviousButton.getAccessibleContext().setAccessibleName("Previous");
+        demoNextButton.getAccessibleContext().setAccessibleName("Next");
         topBar.add(demoPlaybackPanel, BorderLayout.SOUTH);
         updateDemoControls();
 
@@ -92,7 +92,6 @@ public class MainFrame extends JFrame {
 
         rebuildControlLocations();
 
-        depthField.setEnabled(false);
         rerollPointsButton.setEnabled(false);
 
         add(topBar, BorderLayout.NORTH);
@@ -138,10 +137,6 @@ public class MainFrame extends JFrame {
             }
         });
 
-        mode3DCheckBox.addActionListener(e ->
-                depthField.setEnabled(mode3DCheckBox.isSelected())
-        );
-
         pathTypeBox.addActionListener(e -> {
             if (currentGrid != null) {
                 if (demoModeCheckBox.isSelected()) {
@@ -180,7 +175,6 @@ public class MainFrame extends JFrame {
     }
 
     private void registerUiElements() {
-        registerUiElement(UiElement.MODE_3D, controlPanel(mode3DCheckBox));
         registerUiElement(UiElement.HIDE_UNUSED_NODES, controlPanel(hideUnusedNodesCheckBox));
         registerUiElement(UiElement.DEMO_MODE, controlPanel(demoModeCheckBox));
         registerUiElement(
@@ -402,7 +396,6 @@ public class MainFrame extends JFrame {
     }
 
     private enum UiElement {
-        MODE_3D("3D mode"),
         HIDE_UNUSED_NODES("Hide unused nodes"),
         DEMO_MODE("DEMO MODE"),
         THIRD_PERSON_DEMO_CAMERA("DEMO MODE - 3rd person camera"),
@@ -426,21 +419,19 @@ public class MainFrame extends JFrame {
     }
 
     private void generateMatrix() {
-        boolean is3D = mode3DCheckBox.isSelected();
-
         int width;
         int height;
         int depth;
         try {
             width = parsePositiveInt(widthField, "Width");
             height = parsePositiveInt(heightField, "Height");
-            depth = is3D ? parsePositiveInt(depthField, "Depth") : 1;
+            depth = parseNonNegativeInt(depthField);
         } catch (IllegalArgumentException exception) {
             JOptionPane.showMessageDialog(this, exception.getMessage(), "Invalid matrix size", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        currentGrid = new Grid(width, height, depth);
+        currentGrid = new Grid(width, height, Math.max(1, depth), depth > 0);
         currentGrid.randomizeWeights();
 
         stopDemo();
@@ -518,7 +509,7 @@ public class MainFrame extends JFrame {
         }
         if (isThirdPersonDemoActive() || direction == 0) {
             prepareDemoCamera(direction != 0 && !demoPlayback.isPaused(), stepDelay);
-        } else if (mode3DCheckBox.isSelected() && currentGrid.depth > 1) {
+        } else if (currentGrid.is3D) {
             int currentIndex = demoPlayback.visibleNodes() - 1;
             matrixPanel.followPath(demoPath.get(currentIndex - direction), demoPath.get(currentIndex));
         }
@@ -528,7 +519,10 @@ public class MainFrame extends JFrame {
 
     private void updateDemoControls() {
         demoPlaybackPanel.setVisible(demoModeCheckBox.isSelected());
-        demoPlayPauseButton.setText(demoPlayback.isPaused() ? "Play" : "Pause");
+        boolean paused = demoPlayback.isPaused();
+        demoPlayPauseButton.setIcon(paused ? PlaybackIcon.PLAY : PlaybackIcon.PAUSE);
+        demoPlayPauseButton.setToolTipText(paused ? "Resume demo playback" : "Pause demo playback");
+        demoPlayPauseButton.getAccessibleContext().setAccessibleName(paused ? "Play" : "Pause");
         demoPlayPauseButton.setEnabled(demoModeCheckBox.isSelected() && demoPlayback.isActive());
         demoNextButton.setEnabled(demoPlayback.canNext());
         demoPreviousButton.setEnabled(demoPlayback.canPrevious());
@@ -584,9 +578,8 @@ public class MainFrame extends JFrame {
     private boolean isThirdPersonDemoActive() {
         return thirdPersonDemoCheckBox.isSelected()
                 && demoModeCheckBox.isSelected()
-                && mode3DCheckBox.isSelected()
                 && currentGrid != null
-                && currentGrid.depth > 1;
+                && currentGrid.is3D;
     }
 
     private void startDemoBlinking(int stepDelay) {
@@ -624,6 +617,16 @@ public class MainFrame extends JFrame {
             return value;
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException(name + " must be a positive whole number.");
+        }
+    }
+
+    private int parseNonNegativeInt(JTextField field) {
+        try {
+            int value = Integer.parseInt(field.getText().trim());
+            if (value < 0) throw new NumberFormatException();
+            return value;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("Depth must be a non-negative whole number.");
         }
     }
 

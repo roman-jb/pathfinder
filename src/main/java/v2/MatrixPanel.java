@@ -241,7 +241,7 @@ public class MatrixPanel extends JPanel {
                 RenderingHints.VALUE_ANTIALIAS_ON
         );
 
-        if (data.grid.depth == 1) {
+        if (!data.grid.is3D) {
             renderer2D.draw(g2, data, visualScale);
         } else if (thirdPersonCamera) {
             renderer3D.drawThirdPerson(
@@ -266,7 +266,7 @@ public class MatrixPanel extends JPanel {
             return null;
         }
 
-        if (data.grid.depth == 1) {
+        if (!data.grid.is3D) {
             return pickNode2D(mouseX, mouseY);
         }
 

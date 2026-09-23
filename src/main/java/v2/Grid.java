@@ -7,14 +7,20 @@ public class Grid {
     public final int width;
     public final int height;
     public final int depth;
+    public final boolean is3D;
     public final int[][][] weights;
 
     private final Random random = new Random();
 
     public Grid(int width, int height, int depth) {
+        this(width, height, depth, depth > 1);
+    }
+
+    public Grid(int width, int height, int depth, boolean is3D) {
         this.width = width;
         this.height = height;
         this.depth = depth;
+        this.is3D = is3D;
         this.weights = new int[depth][height][width];
     }
 
